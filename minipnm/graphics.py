@@ -28,7 +28,7 @@ def preview(network, values=None):
     polydata.SetLines(polys)
     if colors.GetNumberOfTuples() == network.size[0]:
         polydata.GetPointData().SetScalars(colors)
-    elif any(values):
+    elif colors.GetNumberOfTuples() > 0:
         raise Exception("Mismatch: {} points, {} scalars".format(
                         network.size[0], colors.GetNumberOfTuples()))
 
