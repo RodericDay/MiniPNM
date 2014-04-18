@@ -21,15 +21,6 @@ def test_prune():
     new_size = delaunay.size
     assert np.greater(original_size, new_size).all()
 
-def visual():
-    c = mini.Cubic(np.random.rand(30,30,30))
-    c.preview(c['intensity'])
-
-    d = mini.Delaunay(np.random.rand(300,3))
-    d.preview(d.boundary())
-    d = d - ~d.boundary()
-    d.preview(d.boundary())
-
 if __name__ == '__main__':
     errors = pytest.main([__file__])
     # os.system("find . -name '*.pyc' -delete")

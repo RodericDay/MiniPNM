@@ -7,4 +7,5 @@ __copyright__ = 'Copyright 2014 PMEAL'
 
 from .graphics import *
 from .network import *
+from .algorithms import *
 from .misc import *
