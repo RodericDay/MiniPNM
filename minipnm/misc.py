@@ -18,6 +18,4 @@ def from_image(path_or_ndarray, dmax=200):
     im = im.reshape(im.shape+(1,))
 
     cubic = mini.Cubic(im, im.shape)
-    cubic = cubic - (im.ravel()>im.mean())
-
     return cubic
