@@ -85,6 +85,8 @@ class Network(dict):
             center_distance = other.centroid - self.centroid
             center_distance[axis] = 0 # we take care of this one differently
             shifted_points = other.points - center_distance
+        else:
+            shifted_points = other.points
 
         # the distance between the max for base and min for other should
         # equal to spacing. rearranging, it gives us the required offset
