@@ -58,13 +58,6 @@ class Network(dict):
         w,h,t = self.dims
         return np.array([w/2.+x.min(), h/2.+y.min(), t/2.+z.min()])
 
-    def broadcast(self, value, axis=0):
-        ''' broadcast a value into an array of the required dimensions
-            axis 0 corresponds to pores, axis 1 corresponds to throats
-            syntax needs a lot of work
-        '''
-        return np.ones(self.size[axis])*value
-
     def boundary(self):
         all_points = np.arange(self.size[0])
         boundary_points = spatial.ConvexHull(self.points).vertices
@@ -169,7 +162,7 @@ class Cubic(Network):
 
         rel_coords = np.array(
             [idx for idx,val in np.ndenumerate(ndarray)]).astype(float)
-        abs_coords = rel_coords * dims / np.array(ndarray.shape).clip(1, np.inf)
+        abs_coords = rel_coords * dims / np.array(np.subtract(ndarray.shape,1)).clip(1, np.inf)
         self['x'], self['y'], self['z'] = abs_coords.T
 
         I = np.arange(ndarray.size).reshape(ndarray.shape)
