@@ -102,10 +102,15 @@ class Network(dict):
 
         return new
 
-    def cut(self, head_mask, tail_mask):
+    def cut(self, mask):
+        ''' returns id of throats where the head and the tail are on opposite
+            sides of the mask
+        '''
         return np.array([i for i, (hix, tix) in enumerate(
             zip(self['heads'], self['tails']))
-            if head_mask[hix] and tail_mask[tix]])
+            if ( mask[hix] and ~mask[tix])
+            or (~mask[hix] and  mask[tix])
+            ])
 
     def prune(self, inaccessible, remove_pores=True):
         new = self.copy()
