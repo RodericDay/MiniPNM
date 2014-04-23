@@ -67,8 +67,8 @@ class Network(dict):
         minipnm.save_vtp(self, filename)
         self.filename = filename
 
-    def preview(self, values=[]):
-        minipnm.preview(self, values)
+    def render(self, values=[]):
+        minipnm.render(self, values)
 
     def merge(self, other, axis=2, spacing=0, centering=True, stitch=True):
         new = Network()
@@ -179,6 +179,16 @@ class Cubic(Network):
         self['heads'] = np.array(heads)
         self['tails'] = np.array(tails)
 
+    def asarray(self, values=None):
+        shape = [len(set(d)) for d in self.coords]
+        _ndarray = np.ones(shape) * np.nan
+        rel_coords = np.true_divide(self.points * np.subtract(shape, 1), shape).astype(int)
+
+        actual_indexes = np.ravel_multi_index(rel_coords.T, shape)
+        if values==None:
+            values = self['intensity']
+        _ndarray.flat[actual_indexes] = values
+        return _ndarray.T
 
 class Delaunay(Network):
 

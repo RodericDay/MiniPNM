@@ -1,7 +1,7 @@
 from __future__ import division
 import numpy as np
 
-def preview(network, values=None):
+def render(network, values=None):
     import vtk
 
     points = vtk.vtkPoints()

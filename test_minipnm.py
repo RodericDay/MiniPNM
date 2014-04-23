@@ -17,11 +17,11 @@ def test_save_load_of_vtp_file():
 def test_prune():
     delaunay = mini.Delaunay(np.random.rand(100,3))
     original_size = delaunay.size
-    delaunay = delaunay - ~delaunay.boundary()
-    new_size = delaunay.size
+    changed = delaunay - ~delaunay.boundary()
+    new_size = changed.size
+    assert type(delaunay) is type(changed)
     assert np.greater(original_size, new_size).all()
 
 if __name__ == '__main__':
     errors = pytest.main([__file__])
     # os.system("find . -name '*.pyc' -delete")
-    # visual()
