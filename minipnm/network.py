@@ -49,7 +49,7 @@ class Network(dict):
     def dims(self):
         w = self['x'].max() - self['x'].min()
         h = self['y'].max() - self['y'].min()
-        t = self['z'].max() - self['z'].min()
+        t = self['z'].max() - self['z'].min() or 1
         return np.array([w, h, t])
 
     @property
@@ -184,16 +184,20 @@ class Cubic(Network):
         self['heads'] = np.array(heads)
         self['tails'] = np.array(tails)
 
-    def asarray(self, values=None):
-        shape = [len(set(d)) for d in self.coords]
-        _ndarray = np.ones(shape) * np.nan
-        rel_coords = np.true_divide(self.points * np.subtract(shape, 1), shape).astype(int)
+    @property
+    def resolution(self):
+        return np.array([len(set(d)) for d in self.coords])
 
-        actual_indexes = np.ravel_multi_index(rel_coords.T, shape)
+    def asarray(self, values=None):
+        _ndarray = np.zeros(self.resolution)
+        rel_coords = np.true_divide(self.points, self.dims)*(self.resolution-1)
+        rel_coords = rel_coords.astype(int)
+
+        actual_indexes = np.ravel_multi_index(rel_coords.T, self.resolution)
         if values==None:
             values = self['intensity']
         _ndarray.flat[actual_indexes] = values
-        return _ndarray.T
+        return _ndarray
 
 class Delaunay(Network):
 
@@ -214,3 +218,11 @@ class Delaunay(Network):
                     edges.add(edge)
 
         return np.array(list(edges))
+
+if __name__ == '__main__':
+    R = np.random.randint(0,10,[10,10,1])
+
+    network = Cubic(R)
+    O = network.asarray()
+
+    print np.allclose(R,O)
