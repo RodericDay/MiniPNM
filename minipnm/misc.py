@@ -4,7 +4,7 @@ from scipy import misc
 
 import minipnm as mini
 
-def from_image(path_or_ndarray, dmax=200):
+def imread(path_or_ndarray, dmax=200):
     try:
         im = misc.imread(path_or_ndarray)
     except AttributeError:
@@ -16,6 +16,4 @@ def from_image(path_or_ndarray, dmax=200):
     im/= im.max()
     im = im.T[0]
     im = im.reshape(im.shape+(1,))
-
-    cubic = mini.Cubic(im, im.shape)
-    return cubic
+    return im
