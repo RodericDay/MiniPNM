@@ -18,8 +18,9 @@ def render(network, values=None):
     colors = vtk.vtkUnsignedCharArray()
     colors.SetNumberOfComponents(3)
     if any(values):
-        values-=values.min()
-        values/=values.max()
+        values = values.copy()
+        values-= values.min()
+        values/= values.max()
     for v in values:
         r = 255*(v)
         g = 0
