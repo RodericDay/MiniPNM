@@ -191,7 +191,7 @@ class Cubic(Network):
     def asarray(self, values=None):
         _ndarray = np.zeros(self.resolution)
         rel_coords = np.true_divide(self.points, self.dims)*(self.resolution-1)
-        rel_coords = rel_coords.astype(int)
+        rel_coords = np.rint(rel_coords).astype(int) # absolutely bizarre bug
 
         actual_indexes = np.ravel_multi_index(rel_coords.T, self.resolution)
         if values==None:
@@ -218,11 +218,3 @@ class Delaunay(Network):
                     edges.add(edge)
 
         return np.array(list(edges))
-
-if __name__ == '__main__':
-    R = np.random.randint(0,10,[10,10,1])
-
-    network = Cubic(R)
-    O = network.asarray()
-
-    print np.allclose(R,O)
