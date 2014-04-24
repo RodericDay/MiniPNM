@@ -112,6 +112,12 @@ class Network(dict):
             or (~mask[hix] and  mask[tix])
             ])
 
+    def flux(self, data, cut_ids):
+        vertex_ids = self.pairs[cut_ids].flatten()
+        data_pairs = data[vertex_ids].reshape(vertex_ids.size//2, 2)
+        data_delta = np.abs(np.diff(data_pairs))
+        return data_delta
+
     def prune(self, inaccessible, remove_pores=True):
         new = self.copy()
 
@@ -218,3 +224,12 @@ class Delaunay(Network):
                     edges.add(edge)
 
         return np.array(list(edges))
+
+if __name__ == '__main__':
+    R = np.ones([30,30,1])
+
+    network = Cubic(R)
+    x,y,z = network.coords
+    cut = network.cut(x<0.5)
+    ids = network.pairs[cut].flatten()
+    print x[ids].reshape(ids.size//2, 2)
