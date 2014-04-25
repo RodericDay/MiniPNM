@@ -1,8 +1,7 @@
 import numpy as np
+from scipy import linalg, sparse
 
 def label(network):
-    from scipy import sparse
-
     V, E = network.size
     N = sparse.lil_matrix((V, V))
     hs, ts = network.pairs.T
@@ -32,7 +31,7 @@ def solve_linear(network, ics):
     # verify initial conditions fulfill requirements
     assert np.allclose(A.sum(axis=1), fixed)
 
-    x = np.linalg.solve(A, ics)
+    x = linalg.solve(A, ics)
     # verify solution matches at boundaries
     assert np.allclose(x[fixed], ics[fixed])
 

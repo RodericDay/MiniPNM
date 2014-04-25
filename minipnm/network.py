@@ -19,6 +19,7 @@ import minipnm
     can be found in the `misc` module
 '''
 
+
 class Network(dict):
     filename = None
 
@@ -67,7 +68,7 @@ class Network(dict):
         minipnm.save_vtp(self, filename)
         self.filename = filename
 
-    def render(self, values=[]):
+    def render(self, values=None):
         minipnm.render(self, values)
 
     def merge(self, other, axis=2, spacing=0, centering=True, stitch=True):
@@ -202,8 +203,9 @@ class Cubic(Network):
         actual_indexes = np.ravel_multi_index(rel_coords.T, self.resolution)
         if values==None:
             values = self['intensity']
-        _ndarray.flat[actual_indexes] = values
+        _ndarray.flat[actual_indexes] = values.ravel()
         return _ndarray
+
 
 class Delaunay(Network):
 
@@ -224,12 +226,3 @@ class Delaunay(Network):
                     edges.add(edge)
 
         return np.array(list(edges))
-
-if __name__ == '__main__':
-    R = np.ones([30,30,1])
-
-    network = Cubic(R)
-    x,y,z = network.coords
-    cut = network.cut(x<0.5)
-    ids = network.pairs[cut].flatten()
-    print x[ids].reshape(ids.size//2, 2)

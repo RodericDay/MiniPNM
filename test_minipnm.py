@@ -22,6 +22,16 @@ def test_prune():
     assert type(delaunay) is type(changed)
     assert np.greater(original_size, new_size).all()
 
+def test_rectilinear_integrity():
+    R = np.random.rand(50,40,30)
+    # prune the mini way
+    network = mini.Cubic(R)
+    network = network - (R.ravel()<= R.mean())
+    O = network.asarray()
+    # what it would look like normally
+    M = np.where(R > R.mean(), R, 0)
+    assert np.allclose(M, O)
+
 if __name__ == '__main__':
     errors = pytest.main([__file__])
-    # os.system("find . -name '*.pyc' -delete")
+    os.system("find . -name '*.pyc' -delete")

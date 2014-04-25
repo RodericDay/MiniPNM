@@ -1,6 +1,6 @@
-from __future__ import absolute_import, division, print_function
+from __future__ import absolute_import, division
 import numpy as np
-from scipy import misc
+from scipy import misc, ndimage
 
 import minipnm as mini
 
@@ -17,3 +17,13 @@ def imread(path_or_ndarray, dmax=200):
     im = im.T[0]
     im = im.reshape(im.shape+(1,))
     return im
+
+def gaussian_noise(dims):
+    R = np.random.random(dims)
+    N = np.zeros_like(R)
+    for i in 2**np.arange(6):
+        N += ndimage.filters.gaussian_filter(R, i) * i**0.5
+    # normalize
+    N -= N.min()
+    N /= N.max()
+    return N

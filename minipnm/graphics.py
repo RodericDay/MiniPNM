@@ -1,5 +1,6 @@
 from __future__ import division
 import numpy as np
+import warnings
 
 def render(network, values=None):
     import vtk
@@ -15,15 +16,19 @@ def render(network, values=None):
         vil.InsertNextId(ti)
         polys.InsertNextCell(vil)
 
-    colors = vtk.vtkUnsignedCharArray()
-    colors.SetNumberOfComponents(3)
-    if any(values):
-        values = values.copy()
+    # process value array
+    if values is not None:
+        values = np.array(values).flatten()
         values-= values.min()
         values/= values.max()
+    else:
+        values = []
+
+    colors = vtk.vtkUnsignedCharArray()
+    colors.SetNumberOfComponents(3)
     for v in values:
         r = 255*(v)
-        g = 0
+        g = 100
         b = 255*(1-v)
         colors.InsertNextTuple3(r,g,b)
 
@@ -54,7 +59,6 @@ def render(network, values=None):
     iren.Initialize()
     renWin.Render()
     iren.Start()
-
 
 from xml.etree import ElementTree as ET
 
