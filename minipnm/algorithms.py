@@ -1,5 +1,6 @@
 import numpy as np
 from scipy import linalg, sparse
+from scipy.sparse.linalg import spsolve
 
 def label(network):
     V, E = network.size
@@ -9,7 +10,7 @@ def label(network):
     N[ts, hs] = 1
     return sparse.csgraph.connected_components(N)[1]
 
-def solve_linear(network, ics):
+def linear_solve(network, ics):
     fixed = (ics != 0)
 
     # if there are unconnected islands, they need to be fixed at zero too
@@ -31,7 +32,7 @@ def solve_linear(network, ics):
     # verify initial conditions fulfill requirements
     assert np.allclose(A.sum(axis=1), fixed)
 
-    x = linalg.solve(A, ics)
+    x = spsolve(A, ics)
     # verify solution matches at boundaries
     assert np.allclose(x[fixed], ics[fixed])
 

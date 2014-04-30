@@ -1,8 +1,9 @@
-import minipnm as mini
+import os
 
 import pytest
-import os
 import numpy as np
+
+import minipnm as mini
 
 # tests
 def test_save_load_of_vtp_file():
@@ -31,6 +32,16 @@ def test_rectilinear_integrity():
     # what it would look like normally
     M = np.where(R > R.mean(), R, 0)
     assert np.allclose(M, O)
+
+def test_linear_solver():
+    R = mini.gaussian_noise([50, 50, 1])
+    network = mini.Cubic(R)
+    network = network - (R < np.percentile(R, 20)).ravel()
+    x,y,z = network.coords
+    l = x == x.min()
+    r = x == x.max()
+    ics = 2*l + 1*r
+    sol = mini.linear_solve(network, ics)
 
 if __name__ == '__main__':
     errors = pytest.main([__file__])
