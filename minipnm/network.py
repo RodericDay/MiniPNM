@@ -170,6 +170,12 @@ class Network(dict):
 class Cubic(Network):
 
     def __init__(self, ndarray, dims=[1,1,1]):
+
+        # handle 2D array (image) input
+        if len(ndarray.shape) == 2:
+            dims = ndarray.shape + (1,)
+            ndarray = ndarray.reshape(dims)
+
         self['intensity'] = ndarray.ravel()
 
         rel_coords = np.array(
