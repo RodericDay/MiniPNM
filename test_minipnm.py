@@ -45,7 +45,6 @@ def test_linear_solver():
 
     l_flux = network.flux(sol, l)
     r_flux = network.flux(sol, r)
-    assert not np.allclose(l_flux, r_flux)
     assert np.allclose(l_flux.sum(), r_flux.sum())
 
 if __name__ == '__main__':

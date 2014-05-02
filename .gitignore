@@ -1,3 +1,4 @@
+*.gz
 *.pyc
 .DS_STORE
 minipnm.egg-info/
