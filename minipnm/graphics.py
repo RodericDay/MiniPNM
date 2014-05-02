@@ -19,8 +19,8 @@ def render(network, values=None):
     # process value array
     if values is not None:
         values = np.array(values).flatten()
-        values-= values.min()
-        values/= values.max()
+        values = np.subtract(values, values.min())
+        values = np.true_divide(values, values.max())
     else:
         values = []
 
