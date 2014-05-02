@@ -8,7 +8,8 @@ import minipnm
 
     __init__ must *somehow* append coordinate (x,y,z) and connectivity (heads & tails)
     arrays to the network. that's its role. you can add many other attributes if
-    you so wish, but you MUST provide those two. 
+    you so wish, but you MUST provide those two. the `points` and 
+    `pairs` property setters are offered for convenience
 
     The other main rule is that aside from methods and properties, these objects
     should essentially be *just* dictionaries. One way to think about this is that
@@ -35,12 +36,20 @@ class Network(dict):
         '''
         return np.vstack([self['x'], self['y'], self['z']]).T
 
+    @points.setter
+    def points(self, _points):
+        self['x'], self['y'], self['z'] = _points.T
+
     @property
     def pairs(self):
         ''' returns every 2-dimensional array representing an
             edge or connection between two points
         '''
         return np.vstack([self['heads'], self['tails']]).T
+
+    @pairs.setter
+    def pairs(self, _pairs):
+        self['heads'], self['tails'] = _pairs.T
 
     @property
     def size(self):
@@ -59,8 +68,12 @@ class Network(dict):
         w,h,t = self.dims
         return np.array([w/2.+x.min(), h/2.+y.min(), t/2.+z.min()])
 
+    @property
+    def indexes(self):
+        return np.arange(self.size[0])
+
     def boundary(self):
-        all_points = np.arange(self.size[0])
+        all_points = self.indexes
         boundary_points = spatial.ConvexHull(self.points).vertices
         return np.in1d(all_points, boundary_points).astype(bool)
 
@@ -87,16 +100,14 @@ class Network(dict):
         offset = other.coords[axis].min() \
                 - self.coords[axis].max() - spacing
         shifted_points.T[axis] -= offset
-        new['x'], new['y'], new['z'] = np.vstack([self.points, shifted_points]).T
+        new.points = np.vstack([self.points, shifted_points])
 
         # push the connectivity array by the number of already existing vertices
         Va, Ea = self.size
-        new['heads'], new['tails'] = np.vstack([self.pairs,
-                                                other.pairs+Va
-                                                ]).T
+        new.pairs = np.vstack([self.pairs, other.pairs+Va]).T
 
         # merge the rest
-        for key in set(self.keys()+other.keys()) - {'x','y','z','heads','tails'}:
+        for key in set(self.keys()+other.keys())-{'x','y','z','heads','tails'}:
             values_self = self.get(key, np.zeros(self.size[0]))
             values_other = other.get(key, np.zeros(other.size[0]))
             new[key] = np.hstack([values_self, values_other])
@@ -122,21 +133,18 @@ class Network(dict):
     def prune(self, inaccessible, remove_pores=True):
         new = self.copy()
 
-        accessible = np.arange(new.size[0])[~inaccessible]
+        accessible = self.indexes[~inaccessible]
         good_heads = np.in1d(self['heads'], accessible)
         good_tails = np.in1d(self['tails'], accessible)
-        new['heads'] = self['heads'][good_heads & good_tails]
-        new['tails'] = self['tails'][good_heads & good_tails]
+        new.pairs = self.pairs[good_heads & good_tails]
         if not remove_pores:
             return new
 
         # now we need to update any other values to the new indeces
-        translate = dict(zip(accessible, np.arange(accessible.size)))
-        new['x'] = new['x'][accessible]
-        new['y'] = new['y'][accessible]
-        new['z'] = new['z'][accessible]
-        new['heads'] = np.array(map(translate.get, new['heads']))
-        new['tails'] = np.array(map(translate.get, new['tails']))
+        new.points = self.points[accessible]
+        mapping = dict(zip(accessible, new.indexes))
+        translate = np.vectorize(mapping.__getitem__)
+        new.pairs = translate(new.pairs)
         for key, array in self.items():
             if array.size == self.size[0]:
                 new[key] = array[accessible]
@@ -178,10 +186,10 @@ class Cubic(Network):
 
         self['intensity'] = ndarray.ravel()
 
-        rel_coords = np.array(
+        points_rel = np.array(
             [idx for idx,val in np.ndenumerate(ndarray)]).astype(float)
-        abs_coords = rel_coords * dims / np.array(np.subtract(ndarray.shape,1)).clip(1, np.inf)
-        self['x'], self['y'], self['z'] = abs_coords.T
+        points_abs = points_rel * dims / np.array(np.subtract(ndarray.shape,1)).clip(1, np.inf)
+        self.points = points_abs
 
         I = np.arange(ndarray.size).reshape(ndarray.shape)
         heads, tails = [], []
@@ -190,12 +198,9 @@ class Cubic(Network):
             (I[:,:-1], I[:,1:]),
             (I[:-1], I[1:]),
             ]:
-            hs, ts = np.vstack([A.flat, B.flat])
-            heads.extend(hs)
-            tails.extend(ts)
-
-        self['heads'] = np.array(heads)
-        self['tails'] = np.array(tails)
+            heads.extend(A.flat)
+            tails.extend(B.flat)
+        self.pairs = np.vstack([heads, tails]).T
 
     @property
     def resolution(self):
@@ -216,8 +221,8 @@ class Cubic(Network):
 class Delaunay(Network):
 
     def __init__(self, points, mask=None):
-        self['x'], self['y'], self['z'] = points.T
-        self['heads'], self['tails'] = self.edges_from_points(points).T
+        self.points = points
+        self.pairs = self.edges_from_points(points)
 
     @staticmethod
     def edges_from_points(points, mask=None):
