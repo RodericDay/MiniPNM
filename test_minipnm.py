@@ -36,12 +36,17 @@ def test_rectilinear_integrity():
 def test_linear_solver():
     R = mini.gaussian_noise([50, 50, 1])
     network = mini.Cubic(R)
-    network = network - (R < np.percentile(R, 20)).ravel()
+    network = network - (R<np.percentile(R, 10))
     x,y,z = network.coords
     l = x == x.min()
     r = x == x.max()
     ics = 2*l + 1*r
     sol = mini.linear_solve(network, ics)
+
+    l_flux = network.flux(sol, l)
+    r_flux = network.flux(sol, r)
+    assert not np.allclose(l_flux, r_flux)
+    assert np.allclose(l_flux.sum(), r_flux.sum())
 
 if __name__ == '__main__':
     errors = pytest.main([__file__])

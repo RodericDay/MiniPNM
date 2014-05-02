@@ -118,13 +118,12 @@ class Network(dict):
         ''' returns id of throats where the head and the tail are on opposite
             sides of the mask
         '''
-        return np.array([i for i, (hix, tix) in enumerate(
-            zip(self['heads'], self['tails']))
-            if ( mask[hix] and ~mask[tix])
-            or (~mask[hix] and  mask[tix])
-            ])
+        imask = np.array(mask.nonzero())
+        heads, tails = self.pairs.T
+        return (np.in1d(heads, imask) != np.in1d(tails, imask)).nonzero()
 
-    def flux(self, data, cut_ids):
+    def flux(self, data, mask):
+        cut_ids = self.cut(mask)
         vertex_ids = self.pairs[cut_ids].flatten()
         data_pairs = data[vertex_ids].reshape(vertex_ids.size//2, 2)
         data_delta = np.abs(np.diff(data_pairs))
@@ -133,14 +132,14 @@ class Network(dict):
     def prune(self, inaccessible, remove_pores=True):
         new = self.copy()
 
-        accessible = self.indexes[~inaccessible]
+        accessible = self.indexes[~inaccessible.flatten()]
         good_heads = np.in1d(self['heads'], accessible)
         good_tails = np.in1d(self['tails'], accessible)
         new.pairs = self.pairs[good_heads & good_tails]
         if not remove_pores:
             return new
 
-        # now we need to update any other values to the new indeces
+        # now we need to update any other values to the new indexes
         new.points = self.points[accessible]
         mapping = dict(zip(accessible, new.indexes))
         translate = np.vectorize(mapping.__getitem__)
