@@ -1,3 +1,5 @@
+*prof
+kernprof.py
 *.gz
 *.pyc
 .DS_STORE
