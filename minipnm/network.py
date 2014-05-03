@@ -104,7 +104,7 @@ class Network(dict):
 
         # push the connectivity array by the number of already existing vertices
         Va, Ea = self.size
-        new.pairs = np.vstack([self.pairs, other.pairs+Va]).T
+        new.pairs = np.vstack([self.pairs, other.pairs+Va])
 
         # merge the rest
         for key in set(self.keys()+other.keys())-{'x','y','z','heads','tails'}:
