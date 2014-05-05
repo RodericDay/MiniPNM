@@ -4,10 +4,10 @@ from scipy.sparse.linalg import spsolve
 
 def label(network):
     V, E = network.size
-    N = sparse.lil_matrix((V, V))
     hs, ts = network.pairs.T
-    N[hs, ts] = 1
-    N[ts, hs] = 1
+    fwds = np.hstack([hs, ts])
+    bkds = np.hstack([ts, hs])
+    N = sparse.coo_matrix((np.ones_like(fwds), (fwds, bkds)), shape=(V, V))
     return sparse.csgraph.connected_components(N)[1]
 
 def linear_solve(network, ics):
