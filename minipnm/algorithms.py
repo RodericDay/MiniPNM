@@ -11,25 +11,31 @@ def label(network):
     return sparse.csgraph.connected_components(N)[1]
 
 def linear_solve(network, ics):
+    # the matrix to be solved will involve a stack of ICs and some balances
+    # take as ICs points where ics is defined
     fixed = ics!=0
-    translate = np.hstack(fixed.nonzero()+(~fixed).nonzero())
-    ics = ics[translate]
-    
+
     # if there are unconnected islands, they need to be fixed at zero too
     labels = label(network)
-    island_labels = set(labels) - set(labels[fixed])
+    island_labels = set(labels[~fixed]) - set(labels[fixed])
     fixed = fixed | np.in1d(labels, list(island_labels))
 
-    # build connectivity matrix
+    # this array shifts the ICs around in the correct way
+    mapping = np.hstack(fixed.nonzero()+(~fixed).nonzero())
+
+    # we build a diagonal matrix for ics
+    IC= sparse.diags(np.ones_like(ics), 0).tocsr()
+    # a connectivity matrix representing sources
     heads, tails = network.pairs.T
     i = np.hstack([heads, tails])
     j = np.hstack([tails, heads])
-    fi = fixed.nonzero()[0]
-    IC = sparse.coo_matrix((np.ones_like(fi), (fi, fi)), shape=(ics.size, ics.size)).tocsr()
     C = sparse.coo_matrix((np.ones_like(i), (i,j)), shape=(ics.size, ics.size)).tocsr()
-    D = sparse.diags(np.asarray(C.sum(axis=1).T)[0], 0).tocsr()
-    
+    # and a diagonal matrix representing sinks, as sum of sources
+    D = sparse.diags(C.sum(axis=1).A1, 0).tocsr() # A1 is matrix -> array
+    # the system matrix is a stack of the relevant rows of each
     A = sparse.vstack([(IC)[fixed], (C - D)[~fixed]]).tocsr()
-    x = spsolve(A, ics)
+    x = spsolve(A, ics[mapping])
+
+    assert( np.allclose(x[fixed], ics[fixed]) )
 
     return x

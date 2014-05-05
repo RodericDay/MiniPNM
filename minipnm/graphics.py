@@ -1,9 +1,17 @@
 from __future__ import division
-import numpy as np
 import warnings
 
-def render(network, values=None):
-    import vtk
+import numpy as np
+from matplotlib import cm
+import vtk
+
+def render(network, values=None, cmap='coolwarm'):
+    if values is None:
+        values = np.zeros(network.size[0])
+    else:
+        values = np.array(values)
+        values = np.subtract(values, values.min())
+        values = np.true_divide(values, values.max())
 
     points = vtk.vtkPoints()
     for x,y,z in network.points:
@@ -16,20 +24,11 @@ def render(network, values=None):
         vil.InsertNextId(ti)
         polys.InsertNextCell(vil)
 
-    # process value array
-    if values is not None:
-        values = np.array(values).flatten()
-        values = np.subtract(values, values.min())
-        values = np.true_divide(values, values.max())
-    else:
-        values = []
-
     colors = vtk.vtkUnsignedCharArray()
     colors.SetNumberOfComponents(3)
-    for v in values:
-        r = 255*(v)
-        g = 100
-        b = 255*(1-v)
+    colormap = cm.get_cmap(cmap)
+    mapped = colormap(values)
+    for r,g,b,a in 255*mapped:
         colors.InsertNextTuple3(r,g,b)
 
     polydata = vtk.vtkPolyData()
