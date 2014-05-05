@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from __future__ import absolute_import
 __title__ = 'minipnm'
 __version__ = '0.1.0'
 __author__ = 'PMEAL'
@@ -9,3 +10,4 @@ from .graphics import *
 from .network import *
 from .algorithms import *
 from .misc import *
+from .utils import *
