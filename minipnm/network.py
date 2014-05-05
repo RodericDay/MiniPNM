@@ -84,7 +84,7 @@ class Network(dict):
     def render(self, values=None):
         minipnm.render(self, values)
 
-    def merge(self, other, axis=2, spacing=0, centering=True, stitch=True):
+    def merge(self, other, axis=2, spacing=None, centering=False, stitch=False):
         new = Network()
 
         # alignment along a common centroid
@@ -97,9 +97,10 @@ class Network(dict):
 
         # the distance between the max for base and min for other should
         # equal to spacing. rearranging, it gives us the required offset
-        offset = other.coords[axis].min() \
-                - self.coords[axis].max() - spacing
-        shifted_points.T[axis] -= offset
+        if spacing is not None:
+            offset = other.coords[axis].min() \
+                    - self.coords[axis].max() - spacing
+            shifted_points.T[axis] -= offset
         new.points = np.vstack([self.points, shifted_points])
 
         # push the connectivity array by the number of already existing vertices
@@ -108,8 +109,8 @@ class Network(dict):
 
         # merge the rest
         for key in set(self.keys()+other.keys())-{'x','y','z','heads','tails'}:
-            values_self = self.get(key, np.zeros(self.size[0]))
-            values_other = other.get(key, np.zeros(other.size[0]))
+            values_self = self.get(key, -np.ones(self.size[0]))
+            values_other = other.get(key, -np.ones(other.size[0]))
             new[key] = np.hstack([values_self, values_other])
 
         return new
@@ -168,6 +169,9 @@ class Network(dict):
         return '\n\t'.join(entries)
 
     def __add__(self, other):
+        return self.merge(other, spacing=0, centering=True)
+
+    def __or__(self, other):
         return self.merge(other)
 
     def __sub__(self, inaccessible):
