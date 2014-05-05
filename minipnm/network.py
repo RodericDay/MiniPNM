@@ -1,7 +1,7 @@
 from __future__ import division, absolute_import
 import os
 import numpy as np
-from scipy import spatial
+from scipy import spatial, sparse
 import minipnm
 
 ''' Subclassing rules
@@ -50,6 +50,18 @@ class Network(dict):
     @pairs.setter
     def pairs(self, _pairs):
         self['heads'], self['tails'] = _pairs.T
+
+    @property
+    def connectivity_matrix(self):
+        heads, tails = self.pairs.T
+        fwds = np.hstack([heads, tails])
+        bkds = np.hstack([tails, heads])
+        return sparse.coo_matrix((np.ones_like(fwds), (fwds, bkds)),
+                                 shape=(self.size[0], self.size[0]))
+    
+    @property
+    def clusters(self):
+        return sparse.csgraph.connected_components(self.connectivity_matrix)[1]
 
     @property
     def size(self):
