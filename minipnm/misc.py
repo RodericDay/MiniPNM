@@ -9,11 +9,11 @@ def imread(path_or_ndarray, dmax=200):
         im = misc.imread(path_or_ndarray)
     except AttributeError:
         im = path_or_ndarray
-    rf = np.true_divide(dmax, im.shape).clip(0,1).min()
-    im = misc.imresize(im, rf)
-    im = im.astype(float)
-    im-= im.min()
-    im/= im.max()
+    if dmax:
+        rf = np.true_divide(dmax, im.shape).clip(0,1).min()
+        im = misc.imresize(im, rf)
+    im = np.subtract(im, im.min())
+    im = np.true_divide(im, im.max())
     im = im.T[0]
     im = im.reshape(im.shape+(1,))
     return im

@@ -9,7 +9,7 @@ def render(network, values=None, cmap='coolwarm'):
     if values is None:
         values = np.zeros(network.size[0])
     else:
-        values = np.array(values)
+        values = np.array(values).flatten()
         values = np.subtract(values, values.min())
         values = np.true_divide(values, values.max())
 

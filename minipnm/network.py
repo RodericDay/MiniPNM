@@ -192,6 +192,11 @@ class Network(dict):
 
 class Cubic(Network):
 
+    @classmethod
+    def empty(cls, dims, shape=None):
+        arr = np.zeros(dims)
+        return cls(arr, shape or arr.shape)
+
     def __init__(self, ndarray, dims=[1,1,1]):
 
         # handle 2D array (image) input
