@@ -178,7 +178,7 @@ class Network(dict):
                     key,
                     value.dtype,
                     value.shape,))
-        return '\n\t'.join(entries)
+        return '<'+'\n\t'.join(entries)+'\nSize: {}>'.format(self.size)
 
     def __add__(self, other):
         return self.merge(other, spacing=0, centering=True)
@@ -239,6 +239,11 @@ class Cubic(Network):
 
 
 class Delaunay(Network):
+
+    @classmethod
+    def random(cls, npoints):
+        points = np.random.rand(npoints,3)
+        return cls(points)
 
     def __init__(self, points, mask=None):
         self.points = points
