@@ -60,7 +60,7 @@ class Network(dict):
                                  shape=(self.size[0], self.size[0]))
     
     @property
-    def clusters(self):
+    def labels(self):
         return sparse.csgraph.connected_components(self.connectivity_matrix)[1]
 
     @property

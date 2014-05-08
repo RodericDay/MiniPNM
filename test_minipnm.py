@@ -40,8 +40,8 @@ def test_linear_solver():
     x,y,z = network.coords
     l = x == x.min()
     r = x == x.max()
-    ics = 2*l + 1*r
-    sol = mini.linear_solve(network, ics)
+    dbcs = 2*l + 1*r
+    sol = mini.linear_solve(network, dbcs)
 
     l_flux = network.flux(sol, l)
     r_flux = network.flux(sol, r)
