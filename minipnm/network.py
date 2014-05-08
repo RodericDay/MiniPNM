@@ -93,8 +93,9 @@ class Network(dict):
         minipnm.save_vtp(self, filename)
         self.filename = filename
 
-    def render(self, values=None):
-        minipnm.render(self, values)
+    def render(self, *args, **kwargs):
+        renderer = minipnm.render(self, *args, **kwargs)
+        renderer.Start()
 
     def merge(self, other, axis=2, spacing=None, centering=False, stitch=False):
         new = Network()
@@ -148,15 +149,18 @@ class Network(dict):
         accessible = self.indexes[~inaccessible.flatten()]
         good_heads = np.in1d(self['heads'], accessible)
         good_tails = np.in1d(self['tails'], accessible)
-        new.pairs = self.pairs[good_heads & good_tails]
+        if len(self.pairs) > 0:
+            new.pairs = self.pairs[good_heads & good_tails]
         if not remove_pores:
             return new
 
         # now we need to update any other values to the new indexes
-        new.points = self.points[accessible]
+        if len(new.points):
+            new.points = self.points[accessible]
         mapping = dict(zip(accessible, new.indexes))
         translate = np.vectorize(mapping.__getitem__)
-        new.pairs = translate(new.pairs)
+        if len(new.pairs) > 0:
+            new.pairs = translate(new.pairs)
         for key, array in self.items():
             if array.size == self.size[0]:
                 new[key] = array[accessible]

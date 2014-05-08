@@ -28,3 +28,36 @@ def linear_solve(network, dbcs):
     assert( np.allclose(x[fixed], dbcs[fixed]) )
 
     return x
+
+def percolation(network, sources, thresholds, condition_range,
+                base=0.5, rate=1.3):
+    network = network.copy()
+    # this takes advantage of the auto-scaling of network properties
+    network['indexes'] = network.indexes
+    network['sources'] = sources
+    network['thresholds'] = thresholds
+
+    saturation = np.empty([len(condition_range), network.size[0]])
+    for i, condition in enumerate(np.atleast_1d(condition_range)):
+
+        # create placeholder, then replace where applicable
+        saturation[i] = np.zeros(network.size[0])
+
+        # threshold-bound accessibility
+        inaccessible = network['thresholds']>condition
+        sub_network = network - inaccessible
+
+        # topologically-bound accessibility
+        accessible_labels = sub_network.labels[sub_network['sources']]
+        inaccessible = ~np.in1d(sub_network.labels, accessible_labels)
+        sub_network = sub_network - inaccessible
+
+        def late_pore_fill(ratios, base, rate):
+            if rate==0:
+                return np.ones_like(ratios)*base
+            return base+(1-base)*(1-ratios)**np.true_divide(1,rate)
+
+        ratios = np.true_divide(sub_network['thresholds'], condition)
+        saturation[i][sub_network['indexes']] = late_pore_fill(ratios, base, rate)
+
+    return saturation
