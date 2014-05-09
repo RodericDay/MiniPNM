@@ -60,4 +60,4 @@ def percolation(network, sources, thresholds, condition_range,
         ratios = np.true_divide(sub_network['thresholds'], condition)
         saturation[i][sub_network['indexes']] = late_pore_fill(ratios, base, rate)
 
-    return saturation
+    return np.nan_to_num(saturation)

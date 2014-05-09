@@ -16,4 +16,4 @@ network = network - (im==1)
 x,y,z = network.coords
 ics = 3*(x==x.min()) + 1*(x==x.max())
 network['sol'] = mini.linear_solve(network, ics)
-# network.render(network['sol'])
+network.render(network['sol'])
