@@ -74,16 +74,16 @@ def render(network, values=None, rate=1, alpha=0.2):
     iren.Initialize()
 
     view2d = np.atleast_2d(values) # cuts down on a lot of error-checking
-    view2d = np.subtract(view2d, view2d.min())
-    view2d = np.true_divide(view2d, view2d.max())
-    counter = {'value': 0} # find a better way to get around namespace issues
-    
-    def timeout(object, event):
-        counter['value'] = (counter['value']+1)%len(view2d)
-        wires_actor.GetMapper().GetInput().GetPointData().SetScalars(vcolors(view2d[counter['value']]))
-        renWin.Render()
-    
     if values is not None and len(view2d) > 0:
+        view2d = np.subtract(view2d, view2d.min())
+        view2d = np.true_divide(view2d, view2d.max())
+        counter = {'value': 0} # find better way to get around namespace issues
+
+        def timeout(object, event):
+            counter['value'] = (counter['value']+1)%len(view2d)
+            wires_actor.GetMapper().GetInput().GetPointData().SetScalars(vcolors(view2d[counter['value']]))
+            renWin.Render()
+
         animate(iren, timeout, rate)
     
     return iren

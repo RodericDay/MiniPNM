@@ -76,6 +76,15 @@ def test_percolation():
     
     assert np.allclose(output, target)
 
+def test_render():
+    try:
+        import vtk
+    except ImportError:
+        return
+    network = mini.Delaunay.random(100)
+    mini.render(network)
+    mini.render(network, network['x'])
+
 
 if __name__ == '__main__':
     errors = pytest.main([__file__])
