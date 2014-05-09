@@ -154,13 +154,15 @@ class Network(dict):
         if not remove_pores:
             return new
 
-        # now we need to update any other values to the new indexes
-        if len(new.points):
+        # remove the unwanted pores
+        if len(new.points) > 0:
             new.points = self.points[accessible]
-        mapping = dict(zip(accessible, new.indexes))
-        translate = np.vectorize(mapping.__getitem__)
+        # now we need to shift throat indexes accordingly
         if len(new.pairs) > 0:
-            new.pairs = translate(new.pairs)
+            hs, ts = new.pairs.T
+            mapping = np.zeros(self.size[0], dtype=int)
+            mapping[accessible] = new.indexes
+            new.pairs = np.vstack([mapping[hs], mapping[ts]]).T
         for key, array in self.items():
             if array.size == self.size[0]:
                 new[key] = array[accessible]
