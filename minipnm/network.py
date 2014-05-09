@@ -202,11 +202,8 @@ class Cubic(Network):
         return cls(arr, shape or arr.shape)
 
     def __init__(self, ndarray, dims=[1,1,1]):
-
-        # handle 2D array (image) input
-        if len(ndarray.shape) == 2:
-            dims = ndarray.shape + (1,)
-            ndarray = ndarray.reshape(dims)
+        ndarray = np.atleast_3d(ndarray)
+        dims = tuple(dims) + (1,) * (3 - len(dims))
 
         self['intensity'] = ndarray.ravel()
 

@@ -22,12 +22,12 @@ def vcolors(values, cmap='coolwarm'):
     colors = vtk.vtkUnsignedCharArray()
     colors.SetNumberOfComponents(3)
     colormap = cm.get_cmap(cmap)
-    mapped = colormap(values.astype(float))
+    mapped = colormap(values)
     for r,g,b,a in 255*mapped:
         colors.InsertNextTuple3(r,g,b)
     return colors
 
-def wires(network, alpha=0.5):
+def wires(network, alpha=0.2):
     polydata = vtk.vtkPolyData()
     polydata.SetPoints(vpoints(network))
     polydata.SetLines(vpolys(network))
@@ -62,9 +62,9 @@ def animate(iren, timeout, rate=1):
     iren.AddObserver('TimerEvent', timeout)
     timer = iren.CreateRepeatingTimer(rate)
 
-def render(network, values=None, rate=1):
+def render(network, values=None, rate=1, alpha=0.2):
     ren = vtk.vtkRenderer()
-    wires_actor = wires(network)
+    wires_actor = wires(network, alpha)
     ren.AddActor(wires_actor)
 
     renWin = vtk.vtkRenderWindow()
@@ -74,6 +74,8 @@ def render(network, values=None, rate=1):
     iren.Initialize()
 
     view2d = np.atleast_2d(values) # cuts down on a lot of error-checking
+    view2d = np.subtract(view2d, view2d.min())
+    view2d = np.true_divide(view2d, view2d.max())
     counter = {'value': 0} # find a better way to get around namespace issues
     
     def timeout(object, event):

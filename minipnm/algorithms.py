@@ -4,7 +4,7 @@ from scipy.sparse.linalg import spsolve
 
 def linear_solve(network, dbcs):
     # the matrix to be solved will involve a stack of ICs and some balances
-    # take as ICs points where dbcs is defined
+    # take as fixed the points where dbcs is defined
     fixed = dbcs!=0
 
     # if there are unconnected islands, they need to be fixed at zero too
