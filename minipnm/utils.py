@@ -1,5 +1,9 @@
 import inspect, time, warnings
 
+'''
+utils houses software developer tools and helpers
+'''
+
 IGNORE = ['def ', 'for ', '#', '@', 'print ', 'print(']
 
 def profile(external_globals=None):
