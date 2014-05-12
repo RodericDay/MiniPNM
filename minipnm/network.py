@@ -2,7 +2,8 @@ from __future__ import division, absolute_import
 import os
 import numpy as np
 from scipy import spatial, sparse
-import minipnm
+
+from .graphics import Scene
 
 ''' Subclassing rules
 
@@ -93,9 +94,10 @@ class Network(dict):
         minipnm.save_vtp(self, filename)
         self.filename = filename
 
-    def render(self, *args, **kwargs):
-        renderer = minipnm.render(self, *args, **kwargs)
-        renderer.Start()
+    def render(self, values=None, *args, **kwargs):
+        scene = Scene()
+        scene.add_wires(self.points, self.pairs, values)
+        scene.play()
 
     def merge(self, other, axis=2, spacing=None, centering=False, stitch=False):
         new = Network()
@@ -249,7 +251,7 @@ class Delaunay(Network):
         return cls(points)
 
     def __init__(self, points, mask=None):
-        self.points = points
+        self.points = np.atleast_2d(points)
         self.pairs = self.edges_from_points(points)
 
     @staticmethod

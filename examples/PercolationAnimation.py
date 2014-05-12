@@ -11,4 +11,4 @@ conditions = np.linspace(threshold.min(), threshold.max()*3, 100)
 
 saturations = mini.percolation(network, source, threshold, conditions)
 
-network.render(saturations, rate=10)
+network.render(saturations)

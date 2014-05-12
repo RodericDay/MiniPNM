@@ -1,17 +1,20 @@
-from collections import Counter
+from __future__ import print_function
+from itertools import cycle
 import numpy as np
 from matplotlib import cm
 import vtk
 
-def vpoints(network):
+from .misc import normalize
+
+def vpoints(coords):
     points = vtk.vtkPoints()
-    for x,y,z in network.points:
+    for x,y,z in coords:
         points.InsertNextPoint(x, y, z)
     return points
 
-def vpolys(network):
+def vpolys(pairs):
     polys = vtk.vtkCellArray()
-    for hi, ti in network.pairs:
+    for hi, ti in pairs:
         vil = vtk.vtkIdList()
         vil.InsertNextId(hi)
         vil.InsertNextId(ti)
@@ -27,63 +30,52 @@ def vcolors(values, cmap='coolwarm'):
         colors.InsertNextTuple3(r,g,b)
     return colors
 
-def wires(network, alpha=0.2):
-    polydata = vtk.vtkPolyData()
-    polydata.SetPoints(vpoints(network))
-    polydata.SetLines(vpolys(network))
 
-    mapper = vtk.vtkPolyDataMapper()
-    mapper.SetInput(polydata)
+class Scene(object):
 
-    actor = vtk.vtkActor()
-    actor.GetProperty().SetOpacity(alpha)
-    actor.SetMapper(mapper)
+    def __init__(self):
+        self.ren = vtk.vtkRenderer()
+        self.renWin = vtk.vtkRenderWindow()
+        self.renWin.AddRenderer(self.ren)
+        self.iren = vtk.vtkRenderWindowInteractor()
+        self.iren.SetRenderWindow(self.renWin)
+        self.iren.Initialize()
+        self.iren.AddObserver('TimerEvent', lambda obj, ev: self.renWin.Render())
+        timer = self.iren.CreateRepeatingTimer(1)
 
-    return actor
-
-def sphere(point, volume, alpha=None, color=None):
-    sphere = vtk.vtkSphereSource()
-    sphere.SetCenter(*point)
-    sphere.SetRadius(volume)
-
-    mapper = vtk.vtkPolyDataMapper()
-    mapper.SetInputConnection(sphere.GetOutputPort())
-
-    actor = vtk.vtkActor()
-    if alpha:
+    def add_wires(self, points, pairs, point_weights=None, alpha=1):
+        '''
+        consists of points and lines
+        '''
+        polydata = vtk.vtkPolyData()
+        polydata.SetPoints(vpoints(points))
+        polydata.SetLines(vpolys(pairs))
+        if point_weights is not None:
+            looper = cycle(np.atleast_2d(normalize(point_weights)))
+            def animation(obj, event):
+                polydata.GetPointData().SetScalars(vcolors(next(looper)))
+            self.iren.AddObserver('TimerEvent', animation)
+        mapper = vtk.vtkPolyDataMapper()
+        mapper.SetInput(polydata)
+        actor = vtk.vtkActor()
+        actor.SetMapper(mapper)
         actor.GetProperty().SetOpacity(alpha)
-    if color:
-        actor.GetProperty().SetColor(color)
-    actor.SetMapper(mapper)
+        self.ren.AddActor(actor)
 
-    return actor
+    def add_spheres(self, points, radii, fill_history=None, alpha=0.3):
+        '''
+        consists of centers and radii
+        '''
+        for i, (point, radius) in enumerate(zip(points, radii)):
+            sphere = vtk.vtkSphereSource()
+            sphere.SetCenter(*point)
+            sphere.SetRadius(radius)
+            mapper = vtk.vtkPolyDataMapper()
+            mapper.SetInputConnection(sphere.GetOutputPort())
+            actor = vtk.vtkActor()
+            actor.SetMapper(mapper)
+            actor.GetProperty().SetOpacity(alpha)
+            self.ren.AddActor(actor)
 
-def animate(iren, timeout, rate=1):
-    iren.AddObserver('TimerEvent', timeout)
-    timer = iren.CreateRepeatingTimer(rate)
-
-def render(network, values=None, rate=1, alpha=0.2):
-    ren = vtk.vtkRenderer()
-    wires_actor = wires(network, alpha)
-    ren.AddActor(wires_actor)
-
-    renWin = vtk.vtkRenderWindow()
-    renWin.AddRenderer(ren)
-    iren = vtk.vtkRenderWindowInteractor()
-    iren.SetRenderWindow(renWin)
-    iren.Initialize()
-
-    view2d = np.atleast_2d(values) # cuts down on a lot of error-checking
-    if values is not None and len(view2d) > 0:
-        view2d = np.subtract(view2d, view2d.min())
-        view2d = np.true_divide(view2d, view2d.max())
-        counter = {'value': 0} # find better way to get around namespace issues
-
-        def timeout(object, event):
-            counter['value'] = (counter['value']+1)%len(view2d)
-            wires_actor.GetMapper().GetInput().GetPointData().SetScalars(vcolors(view2d[counter['value']]))
-            renWin.Render()
-
-        animate(iren, timeout, rate)
-    
-    return iren
+    def play(self):
+        self.iren.Start()

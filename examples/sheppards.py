@@ -1,3 +1,4 @@
+# encoding: utf-8
 import gzip
 import numpy as np
 from scipy import ndimage
@@ -7,12 +8,18 @@ path = 'segmented_bead_pack_512.ubc.gz'
 string = gzip.open(path).read()
 im = np.fromstring(string, dtype='int8').reshape(512,512,512)
 im = im[:-1,:-1,:-1]
-im = ndimage.zoom(im, 0.2, order=1)
-im = im[:,:,5]
-im = ndimage.morphology.distance_transform_bf(im)
+im = ndimage.zoom(im, 0.1, order=1)
 
-print im
 network = mini.Cubic(im, im.shape)
-void = network - (im==0)
-structure = network - (im==1)
-void.render(void['intensity'], alpha=1)
+network = network - (im==1)
+
+print "#voxels representing spheres =", np.sum(im)
+centers, radii = mini.extract_spheres(im)
+
+pores = mini.Delaunay(centers)
+
+scene = mini.Scene()
+scene.add_wires(network.points, network.pairs)
+scene.add_wires(pores.points, pores.pairs)
+scene.add_spheres(centers, radii)
+scene.play()

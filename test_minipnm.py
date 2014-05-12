@@ -83,9 +83,8 @@ def test_render():
     except ImportError:
         return
     network = mini.Delaunay.random(100)
-    mini.render(network)
-    mini.render(network, network['x'])
-
+    scene = mini.Scene()
+    scene.add_wires(network.points, network.pairs)
 
 if __name__ == '__main__':
     errors = pytest.main([__file__])
