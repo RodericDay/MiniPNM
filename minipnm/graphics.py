@@ -42,6 +42,7 @@ class Scene(object):
     def __init__(self):
         self.ren = vtk.vtkRenderer()
         self.renWin = vtk.vtkRenderWindow()
+        self.renWin.SetSize(800,600)
         self.renWin.AddRenderer(self.ren)
         self.iren = vtk.vtkRenderWindowInteractor()
         self.iren.SetRenderWindow(self.renWin)
