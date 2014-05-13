@@ -6,6 +6,12 @@ import vtk
 
 from .misc import normalize
 
+def vscalars(data):
+    dataArray = vtk.vtkDoubleArray()
+    for i in data:
+        dataArray.InsertNextValue(i)
+    return dataArray
+
 def vpoints(coords):
     points = vtk.vtkPoints()
     for x,y,z in coords:
@@ -41,7 +47,6 @@ class Scene(object):
         self.iren.SetRenderWindow(self.renWin)
         self.iren.Initialize()
         self.iren.AddObserver('TimerEvent', lambda obj, ev: self.renWin.Render())
-        timer = self.iren.CreateRepeatingTimer(1)
 
     def add_wires(self, points, pairs, point_weights=None, alpha=1):
         '''
@@ -55,6 +60,7 @@ class Scene(object):
             def animation(obj, event):
                 polydata.GetPointData().SetScalars(vcolors(next(looper)))
             self.iren.AddObserver('TimerEvent', animation)
+
         mapper = vtk.vtkPolyDataMapper()
         mapper.SetInput(polydata)
         actor = vtk.vtkActor()
@@ -62,20 +68,37 @@ class Scene(object):
         actor.GetProperty().SetOpacity(alpha)
         self.ren.AddActor(actor)
 
-    def add_spheres(self, points, radii, fill_history=None, alpha=0.3):
+    def add_spheres(self, points, radii, alpha=1, color=(1,1,1)):
         '''
         consists of centers and radii
         '''
-        for i, (point, radius) in enumerate(zip(points, radii)):
-            sphere = vtk.vtkSphereSource()
-            sphere.SetCenter(*point)
-            sphere.SetRadius(radius)
-            mapper = vtk.vtkPolyDataMapper()
-            mapper.SetInputConnection(sphere.GetOutputPort())
-            actor = vtk.vtkActor()
-            actor.SetMapper(mapper)
-            actor.GetProperty().SetOpacity(alpha)
-            self.ren.AddActor(actor)
+        polydata = vtk.vtkPolyData()
+        polydata.SetPoints(vpoints(points))
+        looper = cycle(np.atleast_2d(radii))
+        def animation(obj, event):
+            polydata.GetPointData().SetScalars(vscalars(next(looper)))
+        self.iren.AddObserver('TimerEvent', animation)
 
-    def play(self):
+        def Glyph():
+            pid = glypher.GetPointId()
+            sphere.SetCenter(glypher.GetPoint())
+            sphere.SetRadius(glypher.GetPointData().GetScalars().GetValue(pid))
+            glyphActor.GetProperty().SetColor(*color)
+
+        sphere = vtk.vtkSphereSource()
+        glypher = vtk.vtkProgrammableGlyphFilter()
+        glypher.SetInput(polydata)
+        glypher.SetSource(sphere.GetOutput())
+        glypher.SetGlyphMethod(Glyph)
+        glyphMapper = vtk.vtkPolyDataMapper()
+        glyphMapper.SetInputConnection(glypher.GetOutputPort())
+        glyphActor = vtk.vtkActor()
+        glyphActor.SetMapper(glyphMapper)
+        glyphActor.GetProperty().SetOpacity(alpha)
+        glyphActor.GetProperty().SetColor(*color)
+        self.ren.AddActor(glyphActor)
+
+    def play(self, rate=1):
+        if rate:
+            timer = self.iren.CreateRepeatingTimer(rate)
         self.iren.Start()
