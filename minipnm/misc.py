@@ -12,17 +12,16 @@ def normalize(array):
     array = np.true_divide(array, array.max())
     return array
 
-def imread(path_or_ndarray, dmax=200):
+def imread(path_or_ndarray, zoom=1):
     try:
         im = misc.imread(path_or_ndarray)
     except AttributeError:
         im = path_or_ndarray
-    if dmax:
-        rf = np.true_divide(dmax, im.shape).clip(0,1).min()
-        im = misc.imresize(im, rf)
-    im = normalize(im)
-    im = im.T[0]
-    im = im.reshape(im.shape+(1,))
+    # check if the image is just a stack of sames
+    if not np.any(im - np.dstack([im[:,:,0]]*im.shape[-1])):
+        im = im[:,:,0]
+    im = ndimage.zoom(im, zoom, order=1)
+    im = im.transpose()
     return im
 
 def gaussian_noise(dims):
