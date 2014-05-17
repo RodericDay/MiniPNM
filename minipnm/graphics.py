@@ -46,6 +46,8 @@ class Scene(object):
         self.renWin.AddRenderer(self.ren)
         self.iren = vtk.vtkRenderWindowInteractor()
         self.iren.SetRenderWindow(self.renWin)
+        style = vtk.vtkInteractorStyleTrackballCamera()
+        self.iren.SetInteractorStyle(style)
         self.iren.Initialize()
         self.iren.AddObserver('TimerEvent', lambda obj, ev: self.renWin.Render())
 
