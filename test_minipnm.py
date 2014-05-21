@@ -44,9 +44,9 @@ def test_linear_solver():
     dbcs = 2*l + 1*r
     sol = mini.linear_solve(network, dbcs)
 
-    l_flux = network.flux(sol, l)
-    r_flux = network.flux(sol, r)
-    assert np.allclose(l_flux.sum(), r_flux.sum())
+    l_flux = np.diff(network.cut(l, sol)).sum()
+    r_flux = np.diff(network.cut(r, sol)).sum()
+    assert np.allclose(l_flux, r_flux)
 
 def test_subtract_all():
     network = mini.Cubic.empty([3,3,3])

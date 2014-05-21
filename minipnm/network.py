@@ -130,20 +130,20 @@ class Network(dict):
 
         return new
 
-    def cut(self, mask):
+    def cut(self, mask, values=None):
         ''' returns id of throats where the head and the tail are on opposite
-            sides of the mask
+            sides of the mask. if a value array is given, instead of returning
+            indices, the corresponding values are returned
         '''
         imask = np.array(mask.nonzero())
         heads, tails = self.pairs.T
-        return (np.in1d(heads, imask) != np.in1d(tails, imask)).nonzero()
-
-    def flux(self, data, mask):
-        cut_ids = self.cut(mask)
-        vertex_ids = self.pairs[cut_ids].flatten()
-        data_pairs = data[vertex_ids].reshape(vertex_ids.size//2, 2)
-        data_delta = np.abs(np.diff(data_pairs))
-        return data_delta
+        pair_mask = np.in1d(heads, imask) != np.in1d(tails, imask)
+        if values is None:
+            return pair_mask.nonzero()
+        else:
+            vertex_ids = self.pairs[pair_mask].flatten()
+            value_pairs = values[vertex_ids].reshape(vertex_ids.size//2, 2)
+            return value_pairs
 
     def prune(self, inaccessible, remove_pores=True):
         new = self.copy()
