@@ -49,7 +49,7 @@ class Scene(object):
         style = vtk.vtkInteractorStyleTrackballCamera()
         self.iren.SetInteractorStyle(style)
         self.iren.Initialize()
-        self.iren.AddObserver('TimerEvent', lambda obj, ev: self.renWin.Render())
+        self.iren.AddObserver('TimerEvent', self.timeout)
 
     def add_wires(self, points, pairs, point_weights=None, alpha=1):
         '''
@@ -121,6 +121,10 @@ class Scene(object):
         actor.SetMapper(mapper)
         actor.GetProperty().SetOpacity(alpha)
         self.ren.AddActor(actor)
+
+    def timeout(self, object, event):
+        self.ren.ResetCameraClippingRange()
+        self.renWin.Render()
 
     def play(self, rate=1):
         if rate:
