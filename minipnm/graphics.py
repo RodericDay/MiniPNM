@@ -7,7 +7,7 @@ import vtk
 from .misc import normalize
 
 def vscalars(data):
-    dataArray = vtk.vtkDoubleArray()
+    dataArray = vtk.vtkFloatArray()
     for i in data:
         dataArray.InsertNextValue(i)
     return dataArray
@@ -85,7 +85,10 @@ class Scene(object):
         def Glyph():
             pid = glypher.GetPointId()
             sphere.SetCenter(glypher.GetPoint())
-            sphere.SetRadius(glypher.GetPointData().GetScalars().GetValue(pid))
+            try:
+                sphere.SetRadius(glypher.GetPointData().GetScalars().GetValue(pid))
+            except AttributeError:
+                pass
             glyphActor.GetProperty().SetColor(*color)
 
         sphere = vtk.vtkSphereSource()
@@ -100,6 +103,24 @@ class Scene(object):
         glyphActor.GetProperty().SetOpacity(alpha)
         glyphActor.GetProperty().SetColor(*color)
         self.ren.AddActor(glyphActor)
+
+    def add_tubes(self, points, pairs, alpha=1):
+        polydata = vtk.vtkPolyData()
+        polydata.SetPoints(vpoints(points))
+        polydata.SetLines(vpolys(pairs))
+
+        tubeFilter = vtk.vtkTubeFilter()
+        tubeFilter.SetInput(polydata)
+        tubeFilter.SetRadius(1)
+        tubeFilter.SetNumberOfSides(5)
+        # tubeFilter.CappingOn()
+
+        mapper = vtk.vtkPolyDataMapper()
+        mapper.SetInputConnection(tubeFilter.GetOutputPort())
+        actor = vtk.vtkActor()
+        actor.SetMapper(mapper)
+        actor.GetProperty().SetOpacity(alpha)
+        self.ren.AddActor(actor)
 
     def play(self, rate=1):
         if rate:
