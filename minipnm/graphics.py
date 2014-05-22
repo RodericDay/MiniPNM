@@ -1,4 +1,5 @@
 from __future__ import print_function
+import os
 from itertools import cycle
 import numpy as np
 from matplotlib import cm
@@ -39,10 +40,10 @@ def vcolors(values, cmap='coolwarm'):
 
 class Scene(object):
 
-    def __init__(self):
+    def __init__(self, size=(400,300)):
         self.ren = vtk.vtkRenderer()
         self.renWin = vtk.vtkRenderWindow()
-        self.renWin.SetSize(800,600)
+        self.renWin.SetSize(*size)
         self.renWin.AddRenderer(self.ren)
         self.iren = vtk.vtkRenderWindowInteractor()
         self.iren.SetRenderWindow(self.renWin)
@@ -50,6 +51,7 @@ class Scene(object):
         self.iren.SetInteractorStyle(style)
         self.iren.Initialize()
         self.iren.AddObserver('TimerEvent', self.timeout)
+        self.animation_batch = []
 
     def add_wires(self, points, pairs, point_weights=None, alpha=1):
         '''
@@ -60,9 +62,9 @@ class Scene(object):
         polydata.SetLines(vpolys(pairs))
         if point_weights is not None:
             looper = cycle(np.atleast_2d(normalize(point_weights)))
-            def animation(obj, event):
-                polydata.GetPointData().SetScalars(vcolors(next(looper)))
-            self.iren.AddObserver('TimerEvent', animation)
+            self.animation_batch.append(
+                lambda: polydata.GetPointData().SetScalars(vcolors(next(looper)))
+            )
 
         mapper = vtk.vtkPolyDataMapper()
         mapper.SetInput(polydata)
@@ -78,9 +80,9 @@ class Scene(object):
         polydata = vtk.vtkPolyData()
         polydata.SetPoints(vpoints(points))
         looper = cycle(np.atleast_2d(radii))
-        def animation(obj, event):
-            polydata.GetPointData().SetScalars(vscalars(next(looper)))
-        self.iren.AddObserver('TimerEvent', animation)
+        self.animation_batch.append(
+            lambda: polydata.GetPointData().SetScalars(vscalars(next(looper)))
+        )
 
         def Glyph():
             pid = glypher.GetPointId()
@@ -122,7 +124,9 @@ class Scene(object):
         actor.GetProperty().SetOpacity(alpha)
         self.ren.AddActor(actor)
 
-    def timeout(self, object, event):
+    def timeout(self, object=None, event=None):
+        for fn in self.animation_batch:
+            fn()
         self.ren.ResetCameraClippingRange()
         self.renWin.Render()
 
@@ -130,3 +134,22 @@ class Scene(object):
         if rate:
             timer = self.iren.CreateRepeatingTimer(rate)
         self.iren.Start()
+
+    def save(self, frames=1):
+        w2if = vtk.vtkWindowToImageFilter()
+        w2if.SetInput(self.renWin)
+         
+        writer = vtk.vtkPNGWriter()
+        try:
+            os.system("mkdir tmp")
+
+            for i in range(frames):
+                self.timeout()
+                w2if.Modified()
+                writer.SetFileName("tmp/{:0>3}.png".format(i))
+                writer.SetInput(w2if.GetOutput())
+                writer.Write()
+
+            os.system("convert -delay 20 -loop 0 ./tmp/*.png ~/animated.gif")
+        finally:
+            os.system("rm -r tmp")
