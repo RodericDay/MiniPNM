@@ -47,4 +47,4 @@ def extract_spheres(im):
     labels, num_maxima = ndimage.label(maxima)
     centers = [ndimage.center_of_mass(labels==i) for i in range(1, num_maxima+1)]
     radii = [data[center] for center in centers]
-    return centers, radii
+    return np.array(centers), np.array(radii)

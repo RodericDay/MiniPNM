@@ -1,5 +1,6 @@
 from __future__ import division, absolute_import
 import os
+from itertools import combinations
 import numpy as np
 from scipy import spatial, sparse
 
@@ -265,3 +266,22 @@ class Delaunay(Network):
                     edges.add(edge)
 
         return np.array(list(edges))
+
+
+class PackedSpheres(Network):
+
+    def __init__(self, centers, radii, tpt=0):
+        '''
+        tpt = throat proximity threshold
+        '''
+        self.points = centers
+        self['radii'] = radii
+
+        pairs = []
+        for ia, ib in combinations(range(len(centers)), 2):
+            distance = np.linalg.norm(centers[ib]-centers[ia])
+            radsum = radii[ia]+radii[ib]
+            if (distance - radsum) < tpt:
+                pairs.append([ia,ib])
+
+        self.pairs = np.array(pairs)
