@@ -139,11 +139,9 @@ class Network(dict):
         heads, tails = self.pairs.T
         pair_mask = np.in1d(heads, imask) != np.in1d(tails, imask)
         if values is None:
-            return pair_mask.nonzero()
+            return pair_mask.nonzero()[0] # 1 dimension only
         else:
-            vertex_ids = self.pairs[pair_mask].flatten()
-            value_pairs = values[vertex_ids].reshape(vertex_ids.size//2, 2)
-            return value_pairs
+            return values[self.pairs[pair_mask]]
 
     def prune(self, inaccessible, remove_pores=True):
         new = self.copy()
