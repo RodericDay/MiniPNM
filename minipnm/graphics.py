@@ -40,7 +40,7 @@ def vcolors(values, cmap='coolwarm'):
 
 class Scene(object):
 
-    def __init__(self, size=(400,300)):
+    def __init__(self, size=(800,600)):
         self.ren = vtk.vtkRenderer()
         self.renWin = vtk.vtkRenderWindow()
         self.renWin.SetSize(*size)
