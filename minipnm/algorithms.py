@@ -72,10 +72,12 @@ def invasion(network, sources, thresholds):
     saturation = [sources]
 
     # Repeat until percolation or predefined stopping point
-    breakthrough = False
-    while not breakthrough:
+    while True:
         # Identify interfacial throats (between unsaturated and saturated pores)
         interfacial_throats = network.cut(saturation[-1])
+
+        # Check for breakthrough condition
+        if len(interfacial_throats) == 0: break
 
         # Identify the interfacial throat, thmin, with lowest entry pressure
         entry_pressures = throat_thresholds[interfacial_throats]
@@ -86,7 +88,5 @@ def invasion(network, sources, thresholds):
         new_saturation[network.pairs[th_min]] = 1
         saturation.append(new_saturation)
 
-        # Check for breakthrough condition        
-        breakthrough = (saturation[-1]==1).all()
 
     return np.vstack(saturation)
