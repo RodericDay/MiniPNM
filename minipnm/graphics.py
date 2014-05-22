@@ -53,76 +53,95 @@ class Scene(object):
         self.iren.AddObserver('TimerEvent', self.timeout)
         self.animation_batch = []
 
-    def add_wires(self, points, pairs, point_weights=None, alpha=1):
+    def map_and_append(fn):
         '''
-        consists of points and lines
+        this decorator handles some boilerplate code regarding actor addition
         '''
+        def handler(self, *args, **kwargs):
+            alpha = kwargs.pop('alpha', 1)
+            color = kwargs.pop('color', None)
+
+            polydata = fn(self, *args, **kwargs)
+            mapper = vtk.vtkPolyDataMapper()
+            try:
+                mapper.SetInput(polydata)
+            except TypeError:
+                mapper.SetInputConnection(polydata.GetOutputPort())
+            actor = vtk.vtkActor()
+            actor.SetMapper(mapper)
+            actor.GetProperty().SetOpacity(alpha)
+            if color is not None:
+                mapper.SetScalarVisibility(False)
+                actor.GetProperty().SetColor(*color)
+            self.ren.AddActor(actor)
+
+        return handler
+
+    @map_and_append
+    def add_wires(self, points, pairs, history=None, cmap='coolwarm'):
         polydata = vtk.vtkPolyData()
         polydata.SetPoints(vpoints(points))
         polydata.SetLines(vpolys(pairs))
-        if point_weights is not None:
-            looper = cycle(np.atleast_2d(normalize(point_weights)))
+
+        if history is not None:
+            looper = cycle(np.atleast_2d(normalize(history)))
             self.animation_batch.append(
-                lambda: polydata.GetPointData().SetScalars(vcolors(next(looper)))
+                lambda: polydata.GetPointData().SetScalars(
+                        vcolors(next(looper), cmap))
             )
 
-        mapper = vtk.vtkPolyDataMapper()
-        mapper.SetInput(polydata)
-        actor = vtk.vtkActor()
-        actor.SetMapper(mapper)
-        actor.GetProperty().SetOpacity(alpha)
-        self.ren.AddActor(actor)
+        return polydata
 
-    def add_spheres(self, points, radii, alpha=1, color=(1,1,1)):
+    @map_and_append
+    def add_tubes(self, points, pairs, history=None, radius=1, detail=5,
+                  cmap='coolwarm'):
+        polydata = vtk.vtkPolyData()
+        polydata.SetPoints(vpoints(points))
+        polydata.SetLines(vpolys(pairs))
+
+        if history is not None:
+            looper = cycle(np.atleast_2d(normalize(history)))
+            self.animation_batch.append(
+                lambda: polydata.GetPointData().SetScalars(
+                        vcolors(next(looper), cmap))
+            )
+
+        tubeFilter = vtk.vtkTubeFilter()
+        tubeFilter.SetInput(polydata)
+        tubeFilter.SetRadius(radius)
+        tubeFilter.SetNumberOfSides(detail)
+        return tubeFilter
+
+    @map_and_append
+    def add_spheres(self, points, radii):
         '''
         consists of centers and radii
         '''
         polydata = vtk.vtkPolyData()
         polydata.SetPoints(vpoints(points))
+
         looper = cycle(np.atleast_2d(radii))
         self.animation_batch.append(
-            lambda: polydata.GetPointData().SetScalars(vscalars(next(looper)))
+            lambda: polydata.GetPointData().SetScalars(
+                    vscalars(next(looper)))
         )
 
         def Glyph():
             pid = glypher.GetPointId()
             sphere.SetCenter(glypher.GetPoint())
             try:
-                sphere.SetRadius(glypher.GetPointData().GetScalars().GetValue(pid))
+                value = glypher.GetPointData().GetScalars().GetValue(pid)
+                sphere.SetRadius(value)
             except AttributeError:
                 pass
-            glyphActor.GetProperty().SetColor(*color)
 
         sphere = vtk.vtkSphereSource()
         glypher = vtk.vtkProgrammableGlyphFilter()
         glypher.SetInput(polydata)
         glypher.SetSource(sphere.GetOutput())
         glypher.SetGlyphMethod(Glyph)
-        glyphMapper = vtk.vtkPolyDataMapper()
-        glyphMapper.SetInputConnection(glypher.GetOutputPort())
-        glyphActor = vtk.vtkActor()
-        glyphActor.SetMapper(glyphMapper)
-        glyphActor.GetProperty().SetOpacity(alpha)
-        glyphActor.GetProperty().SetColor(*color)
-        self.ren.AddActor(glyphActor)
 
-    def add_tubes(self, points, pairs, alpha=1):
-        polydata = vtk.vtkPolyData()
-        polydata.SetPoints(vpoints(points))
-        polydata.SetLines(vpolys(pairs))
-
-        tubeFilter = vtk.vtkTubeFilter()
-        tubeFilter.SetInput(polydata)
-        tubeFilter.SetRadius(1)
-        tubeFilter.SetNumberOfSides(5)
-        # tubeFilter.CappingOn()
-
-        mapper = vtk.vtkPolyDataMapper()
-        mapper.SetInputConnection(tubeFilter.GetOutputPort())
-        actor = vtk.vtkActor()
-        actor.SetMapper(mapper)
-        actor.GetProperty().SetOpacity(alpha)
-        self.ren.AddActor(actor)
+        return glypher
 
     def timeout(self, object=None, event=None):
         for fn in self.animation_batch:
