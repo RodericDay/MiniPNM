@@ -61,3 +61,32 @@ def percolation(network, sources, thresholds, condition_range,
         saturation[i][sub_network['indexes']] = late_pore_fill(ratios, base, rate)
 
     return np.nan_to_num(saturation)
+
+def invasion(network, sources, thresholds):
+    network = network.copy()
+
+    # assume throat access is bound by minimal pore access
+    throat_thresholds = thresholds[network.pairs].max(axis=1)
+
+    # Assign a list of pores that are initially filled with liquid water
+    saturation = [sources]
+
+    # Repeat until percolation or predefined stopping point
+    breakthrough = False
+    while not breakthrough:
+        # Identify interfacial throats (between unsaturated and saturated pores)
+        interfacial_throats = network.cut(saturation[-1])
+
+        # Identify the interfacial throat, thmin, with lowest entry pressure
+        entry_pressures = throat_thresholds[interfacial_throats]
+        th_min = interfacial_throats[entry_pressures.argmin()]
+
+        # Invade any air-filled pore adjacent to thmin with liquid water
+        new_saturation = saturation[-1].copy()
+        new_saturation[network.pairs[th_min]] = 1
+        saturation.append(new_saturation)
+
+        # Check for breakthrough condition        
+        breakthrough = (saturation[-1]==1).all()
+
+    return np.vstack(saturation)

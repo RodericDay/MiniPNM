@@ -9,7 +9,7 @@ string = gzip.open(path).read()
 im = np.fromstring(string, dtype='int8').reshape(512,512,512)
 im = im[:-1,:-1,:-1]
 im = ndimage.zoom(im, 0.4, order=1)
-im = im[:,:,:2]
+im = im[:,:,100:102]
 
 network = mini.Cubic(im, im.shape)
 network = network - (im==1)
@@ -22,9 +22,10 @@ pores = mini.Delaunay(centers)
 pores['radii'] = np.atleast_1d(radii)
 pores = pores - pores.boundary()
 source = pores['x'] == pores['x'].max()
-threshold = pores['radii']
+threshold = 1/pores['radii']
 conditions = np.linspace(threshold.min(), threshold.max()*3, 100)
-saturations = mini.percolation(pores, source, threshold, conditions)
+# saturations = mini.percolation(pores, source, threshold, conditions)
+saturations = mini.invasion(pores, source, threshold)
 
 scene = mini.Scene()
 scene.add_wires(network.points, network.pairs, sol, alpha=1)
