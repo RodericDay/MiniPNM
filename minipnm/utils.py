@@ -1,48 +1,52 @@
 import inspect, time, warnings
+import matplotlib.pyplot as plt
 
 '''
 utils houses software developer tools and helpers
 '''
 
-IGNORE = ['def ', 'for ', '#', '@', 'print ', 'print(']
+class FormulaDict(dict):
+    '''
+    A dictionary intended to hold either numpy arryas or formulae involving
+    numpy arrays. Excel-like functionality.
+    '''
 
-def profile(external_globals=None):
-
-    def as_decorator(fn):
-        if external_globals:
-            globals().update(external_globals)
-        source, firstlineno = inspect.getsourcelines(fn)
-        source = [line.strip('\n') for line in source]
-        padded_length = max(len(line) for line in source) + 5
-
-        profiled_source_lines = []
-        psl_append = lambda string: profiled_source_lines.append(indent+string)
-        for indented_line in source[1:]:
-            line = indented_line.strip()
-
-            if not line or any(line.startswith(i) for i in IGNORE):
-                profiled_source_lines.append(indented_line)
-                continue
-
-            indent = ' '*(len(indented_line)-len(line))
-            psl_append("start = time.time()")
-
-            if line.startswith("return "):
-                psl_append(line.replace("return ", "out = "))
-            else:
-                psl_append(line)
-            psl_append("time_taken = 1000*(time.time()-start)")
-            psl_append("print( '{}{{time_taken:>10.0f}}ms'.format(**locals()) )"\
-                       .format(indented_line.ljust(padded_length)))
-            if line.startswith("return "):
-                psl_append("return out")
-        
-        profiled_source = '\n'.join(profiled_source_lines)
+    def __setitem__(self, key, value):
         try:
-            exec profiled_source in globals()
-            return eval(fn.func_name)
-        except IndentationError as e:
-            print( profiled_source )
-            raise(e)
-    
-    return as_decorator
+            assert hasattr(value, "__call__")
+            super(FormulaDict, self).__setitem__(key, value)
+        except AssertionError:
+            array = np.array(value)
+            # do some checks on array
+            super(FormulaDict, self).__setitem__(key, array)
+
+    def __getitem__(self, key):
+        maybe_function = super(FormulaDict, self).__getitem__(key)
+        if hasattr(maybe_function, "__call__"):
+            arginfo = inspect.getargspec(maybe_function)
+            return maybe_function(*(self[k] for k in arginfo.args))
+        else:
+            return maybe_function
+
+    def __str__(self):
+        return '\n'.join("{key:<10} : {value}".format(**locals()) \
+                         for key, value in sorted(self.items()))
+
+def view_stack(path):
+    '''
+    Simple shortcut to explore the .ubc files provided by Sheppard
+    '''
+    import gzip
+    import numpy as np
+    from matplotlib.widgets import Slider
+    plt.rcParams['image.cmap'] = 'binary'
+    string = gzip.open(path).read()
+    im = np.fromstring(string, dtype='int8').reshape(512,512,512)
+
+    fig, ax = plt.subplots(1)
+    ax.imshow(im[0])
+    fig.subplots_adjust(bottom=0.2)
+    sax = fig.add_axes([0.2, 0.1, 0.6, 0.05])
+    slider = Slider(sax, 'Z', 0, len(im), 0, closedmax=False)
+    conn = slider.on_changed(lambda value: ax.imshow(im[int(value)]))
+    plt.show()
