@@ -11,3 +11,4 @@ from .network import *
 from .algorithms import *
 from .misc import *
 from .utils import *
+from .binary import *
