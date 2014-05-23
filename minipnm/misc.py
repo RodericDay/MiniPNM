@@ -37,6 +37,7 @@ def extract_spheres(im):
     credit to untubu @ stackoverflow for this
     still needs a lot of improvement
     '''
+    im = np.atleast_3d(im)
     data = ndimage.morphology.distance_transform_edt(im)
     max_data = ndimage.filters.maximum_filter(data, 10)
     maxima = data==max_data # but this includes some globally low voids
