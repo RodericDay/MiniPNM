@@ -1,6 +1,6 @@
 from __future__ import division, absolute_import
 import os
-from itertools import combinations
+import itertools
 import numpy as np
 from scipy import spatial, sparse
 
@@ -47,11 +47,16 @@ class Network(dict):
         ''' returns every 2-dimensional array representing an
             edge or connection between two points
         '''
-        return np.vstack([self['heads'], self['tails']]).T
+        return np.vstack([self.get('heads', []), self.get('tails', [])]).T
 
     @pairs.setter
     def pairs(self, _pairs):
         self['heads'], self['tails'] = _pairs.T
+
+    @pairs.deleter
+    def pairs(self):
+        del self['heads']
+        del self['tails']
 
     @property
     def connectivity_matrix(self):
@@ -96,6 +101,9 @@ class Network(dict):
         self.filename = filename
 
     def render(self, values=None, *args, **kwargs):
+        if values is not None:
+            assert np.array(values).shape[-1] == self.size[0]
+
         scene = Scene()
         scene.add_wires(self.points, self.pairs, values)
         scene.play()
@@ -260,12 +268,15 @@ class Delaunay(Network):
 
     @staticmethod
     def edges_from_points(points, mask=None):
-        triangulation = spatial.Delaunay(points)
+        non_coplanar_cols = np.diff(points, axis=0).sum(axis=0).nonzero()
+        non_coplanar_points = points.T[non_coplanar_cols].T
+        triangulation = spatial.Delaunay(non_coplanar_points)
         edges = set()
-        for a,b,c,d in triangulation.vertices:
-            if mask is not None:
-                a,b,c,d = (mask[i] for i in [a,b,c,d])
-            for edge in [(a,b),(b,c),(c,d),(d,a)]:
+        for unindexed in triangulation.vertices:
+            indexed = mask[unindexed] if mask else unindexed
+            cyclable = itertools.cycle(unindexed)
+            next(cyclable)
+            for edge in zip(unindexed, cyclable):
                 edge = tuple(sorted(edge))
                 if edge not in edges:
                     edges.add(edge)
@@ -283,10 +294,11 @@ class PackedSpheres(Network):
         self['radii'] = radii
 
         pairs = []
-        for ia, ib in combinations(range(len(centers)), 2):
+        for ia, ib in itertools.combinations(range(len(centers)), 2):
             distance = np.linalg.norm(centers[ib]-centers[ia])
             radsum = radii[ia]+radii[ib]
             if (distance - radsum) < tpt:
                 pairs.append([ia,ib])
 
-        self.pairs = np.array(pairs)
+        if pairs:
+            self.pairs = np.array(pairs)
