@@ -144,7 +144,7 @@ class Network(dict):
             sides of the mask. if a value array is given, instead of returning
             indices, the corresponding values are returned
         '''
-        imask = np.array(mask.nonzero())
+        imask = self.indexes[np.array(mask).nonzero()]
         heads, tails = self.pairs.T
         pair_mask = np.in1d(heads, imask) != np.in1d(tails, imask)
         if values is None:
