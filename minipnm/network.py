@@ -175,6 +175,11 @@ class Network(dict):
         clone.update(self)
         return clone
 
+    def split(self, mask):
+        subnetwork_1 = self - mask
+        subnetwork_2 = self - ~mask
+        return subnetwork_1, subnetwork_2
+
     def __repr__(self):
         return self.__class__.__name__+str(self.size)
 
