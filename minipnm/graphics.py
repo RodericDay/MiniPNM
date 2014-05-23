@@ -154,7 +154,8 @@ class Scene(object):
             timer = self.iren.CreateRepeatingTimer(rate)
         self.iren.Start()
 
-    def save(self, frames=1):
+    def save(self, size=(400,300), frames=1):
+        self.renWin.SetSize(*size)
         w2if = vtk.vtkWindowToImageFilter()
         w2if.SetInput(self.renWin)
          
