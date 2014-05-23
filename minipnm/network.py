@@ -40,6 +40,7 @@ class Network(dict):
 
     @points.setter
     def points(self, _points):
+        _points = np.nan_to_num(np.array(_points))
         self['x'], self['y'], self['z'] = _points.T
 
     @property
@@ -51,7 +52,9 @@ class Network(dict):
 
     @pairs.setter
     def pairs(self, _pairs):
-        self['heads'], self['tails'] = _pairs.T
+        ipairs = np.array(_pairs, dtype=int)
+        assert np.allclose(ipairs, _pairs)
+        self['heads'], self['tails'] = ipairs.T
 
     @pairs.deleter
     def pairs(self):

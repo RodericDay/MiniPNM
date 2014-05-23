@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from __future__ import division
 import os
 
 import pytest
@@ -6,7 +7,6 @@ import numpy as np
 
 import minipnm as mini
 
-# tests
 def disabled_test_save_load_of_vtp_file():
     network = mini.Cubic(np.ones([3,3,3]))
     mini.save_vtp(network, 'test.vtp')
@@ -69,10 +69,10 @@ def test_percolation():
     output = mini.percolation(network, sources, thresholds, conditions, rate=1)
 
     target = np.array([
-        [1./2, 0,    0,    0,    0   ],
-        [3./4, 1./2, 0,    0,    0   ],
-        [5./6, 2./3, 1./2, 0,    0   ],
-        [7./8, 3./4, 5./8, 1./2, 7./8],
+        [1/2,   0,   0,   0,   0],
+        [3/4, 1/2,   0,   0,   0],
+        [5/6, 2/3, 1/2,   0,   0],
+        [7/8, 3/4, 5/8, 1/2, 7/8],
     ])
     
     assert np.allclose(output, target)
@@ -85,6 +85,14 @@ def test_render():
     network = mini.Delaunay.random(100)
     scene = mini.Scene()
     scene.add_wires(network.points, network.pairs)
+
+def test_handling_of_pseudo_array_input():
+    network = mini.Network()
+    with pytest.raises(TypeError):
+        network.points = None, None, None
+    network.points = [(1,1,1), [2,2,2], np.array([3,3,3])]
+    network.pairs = (0,1)
+    network.pairs = [(1,2), [2,0]]
 
 if __name__ == '__main__':
     errors = pytest.main([__file__])
