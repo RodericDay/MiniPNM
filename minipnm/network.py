@@ -208,7 +208,7 @@ class Cubic(Network):
         ndarray = np.atleast_3d(ndarray)
         dims = tuple(dims) + (1,) * (3 - len(dims))
 
-        self['intensity'] = ndarray.ravel()
+        self['source'] = ndarray.ravel()
 
         points_rel = np.array(
             [idx for idx,val in np.ndenumerate(ndarray)]).astype(float)
@@ -237,7 +237,7 @@ class Cubic(Network):
 
         actual_indexes = np.ravel_multi_index(rel_coords.T, self.resolution)
         if values==None:
-            values = self['intensity']
+            values = self['source']
         _ndarray.flat[actual_indexes] = values.ravel()
         return _ndarray
 
