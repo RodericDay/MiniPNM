@@ -62,7 +62,7 @@ def percolation(network, sources, thresholds, condition_range,
 
     return np.nan_to_num(saturation)
 
-def invasion(network, sources, thresholds):
+def invasion(network, sources, thresholds, sinks=None):
     network = network.copy()
 
     # assume throat access is bound by minimal pore access
@@ -76,8 +76,9 @@ def invasion(network, sources, thresholds):
         # Identify interfacial throats (between unsaturated and saturated pores)
         interfacial_throats = network.cut(saturation[-1])
 
-        # Check for breakthrough condition
-        if len(interfacial_throats) == 0: break
+        # Check for breakthrough conditions
+        if sinks is not None and any(saturation[-1][sinks]): break
+        elif len(interfacial_throats) == 0: break
 
         # Identify the interfacial throat, thmin, with lowest entry pressure
         entry_pressures = throat_thresholds[interfacial_throats]
@@ -87,6 +88,5 @@ def invasion(network, sources, thresholds):
         new_saturation = saturation[-1].copy()
         new_saturation[network.pairs[th_min]] = 1
         saturation.append(new_saturation)
-
 
     return np.vstack(saturation)
