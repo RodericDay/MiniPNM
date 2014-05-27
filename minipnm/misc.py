@@ -1,10 +1,14 @@
 from __future__ import absolute_import, division
+import bisect
 import numpy as np
 from scipy import misc, ndimage
 
 '''
 misc houses scientific tools and helpers
 '''
+def mid(array):
+    center = (array.max() - array.min())/2.
+    return array[bisect.bisect_left(array, center)]
 
 def normalize(array):
     array = np.atleast_1d(array)
