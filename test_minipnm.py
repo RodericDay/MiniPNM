@@ -60,13 +60,13 @@ def test_linear_solver():
 
 def test_subtract_all():
     network = mini.Cubic.empty([3,3,3])
-    reduced = network - np.ones(network.size[0]).astype(bool)
+    reduced = network - np.ones(network.order).astype(bool)
     assert set(network.keys()) == set(reduced.keys())
-    assert reduced.size == (0,0)
+    assert reduced.size == 0
     assert all(value.size==0 for value in reduced.values())
-    rereduced = reduced - np.ones(reduced.size[0]).astype(bool)
+    rereduced = reduced - np.ones(reduced.order).astype(bool)
     assert set(network.keys()) == set(rereduced.keys())
-    assert rereduced.size == (0,0)
+    assert rereduced.size == 0
     assert all(value.size==0 for value in rereduced.values())
 
 def test_percolation():

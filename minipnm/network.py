@@ -67,15 +67,19 @@ class Network(dict):
         fwds = np.hstack([heads, tails])
         bkds = np.hstack([tails, heads])
         return sparse.coo_matrix((np.ones_like(fwds), (fwds, bkds)),
-                                 shape=(self.size[0], self.size[0]))
+                                 shape=(self.order, self.order))
     
     @property
     def labels(self):
         return sparse.csgraph.connected_components(self.connectivity_matrix)[1]
 
     @property
+    def order(self):
+        return len(self.points)
+
+    @property
     def size(self):
-        return len(self.points), len(self.pairs)
+        return len(self.pairs)
 
     @property
     def dims(self):
@@ -92,7 +96,7 @@ class Network(dict):
 
     @property
     def indexes(self):
-        return np.arange(self.size[0])
+        return np.arange(self.order)
 
     def boundary(self):
         all_points = self.indexes
@@ -105,7 +109,7 @@ class Network(dict):
 
     def render(self, values=None, *args, **kwargs):
         if values is not None:
-            assert np.array(values).shape[-1] == self.size[0]
+            assert np.array(values).shape[-1] == self.order
 
         scene = Scene()
         scene.add_wires(self.points, self.pairs, values)
@@ -136,8 +140,8 @@ class Network(dict):
 
         # merge the rest
         for key in set(self.keys()+other.keys())-{'x','y','z','heads','tails'}:
-            values_self = self.get(key, -np.ones(self.size[0]))
-            values_other = other.get(key, -np.ones(other.size[0]))
+            values_self = self.get(key, -np.ones(self.order))
+            values_other = other.get(key, -np.ones(other.order))
             new[key] = np.hstack([values_self, values_other])
 
         return new
@@ -172,11 +176,11 @@ class Network(dict):
         # now we need to shift throat indexes accordingly
         if len(new.pairs) > 0:
             hs, ts = new.pairs.T
-            mapping = np.zeros(self.size[0], dtype=int)
+            mapping = np.zeros(self.order, dtype=int)
             mapping[accessible] = new.indexes
             new.pairs = np.vstack([mapping[hs], mapping[ts]]).T
         for key, array in self.items():
-            if array.size == self.size[0]:
+            if array.size == self.order:
                 new[key] = array[accessible]
 
         return new

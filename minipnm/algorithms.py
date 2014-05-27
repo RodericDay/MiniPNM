@@ -37,11 +37,11 @@ def percolation(network, sources, thresholds, condition_range,
     network['sources'] = sources
     network['thresholds'] = thresholds
 
-    saturation = np.empty([len(condition_range), network.size[0]])
+    saturation = np.empty([len(condition_range), network.order])
     for i, condition in enumerate(np.atleast_1d(condition_range)):
 
         # create placeholder, then replace where applicable
-        saturation[i] = np.zeros(network.size[0])
+        saturation[i] = np.zeros(network.order)
 
         # threshold-bound accessibility
         inaccessible = network['thresholds']>condition
