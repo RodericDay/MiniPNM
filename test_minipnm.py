@@ -34,6 +34,16 @@ def test_rectilinear_integrity():
     M = np.where(R > R.mean(), R, 0)
     assert np.allclose(M, O)
 
+def test_rectilinear_integrity_2d():
+    R = np.random.rand(15,30)
+    # prune the mini way
+    network = mini.Cubic(R)
+    network = network - (R.ravel()<= R.mean())
+    O = network.asarray()
+    # what it would look like normally
+    M = np.where(R > R.mean(), R, 0)
+    assert np.allclose(M, O)
+
 def test_linear_solver():
     R = mini.gaussian_noise([20, 20, 20])
     network = mini.Cubic(R)

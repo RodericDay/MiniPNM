@@ -255,7 +255,7 @@ class Cubic(Network):
         if values==None:
             values = self['source']
         _ndarray.flat[actual_indexes] = values.ravel()
-        return _ndarray
+        return _ndarray.squeeze()
 
 
 class Delaunay(Network):
