@@ -119,8 +119,9 @@ class Network(dict):
             values = self[values]
         except KeyError:
             # show error, but plot anyway (fail gracefully?)
-            traceback.print_exc()
-            values = None
+            if values:
+                traceback.print_exc()
+                values = None
         except TypeError:
             # probably an array, but make sure it fits!
             assert np.array(values).shape[-1] == self.order
