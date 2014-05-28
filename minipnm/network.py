@@ -8,6 +8,9 @@ from .graphics import Scene
 
 ''' Subclassing rules
 
+    A "network" as defined by MiniPNM is essentially a graph and a coordinate
+    array coupled together.
+
     __init__ must *somehow* append coordinate (x,y,z) and connectivity (heads & tails)
     arrays to the network. that's its role. you can add many other attributes if
     you so wish, but you MUST provide those two. the `points` and 
@@ -20,6 +23,8 @@ from .graphics import Scene
 
     Convenience methods that automate some work (ie. import an image from a file)
     can be found in the `misc` module
+
+    When in doubt: http://en.wikipedia.org/wiki/Glossary_of_graph_theory
 '''
 
 
@@ -64,8 +69,8 @@ class Network(dict):
     @property
     def connectivity_matrix(self):
         heads, tails = self.pairs.T
-        fwds = np.hstack([heads, tails])
-        bkds = np.hstack([tails, heads])
+        fwds = np.hstack([tails, heads])
+        bkds = np.hstack([heads, tails])
         return sparse.coo_matrix((np.ones_like(fwds), (fwds, bkds)),
                                  shape=(self.order, self.order))
     
