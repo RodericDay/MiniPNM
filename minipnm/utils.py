@@ -1,4 +1,5 @@
-import inspect, time, warnings
+import gzip
+import numpy as np
 import matplotlib.pyplot as plt
 
 '''
@@ -32,12 +33,16 @@ class FormulaDict(dict):
         return '\n'.join("{key:<10} : {value}".format(**locals()) \
                          for key, value in sorted(self.items()))
 
+def ubcread(path):
+    string = gzip.open(path).read()
+    im = np.fromstring(string, dtype='int8').reshape(512,512,512)
+    im = im[:-1,:-1,:-1]
+    return im
+
 def view_stack(path):
     '''
     Simple shortcut to explore the .ubc files provided by Sheppard
     '''
-    import gzip
-    import numpy as np
     from matplotlib.widgets import Slider
     plt.rcParams['image.cmap'] = 'binary'
     string = gzip.open(path).read()
