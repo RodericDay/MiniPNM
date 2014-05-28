@@ -106,7 +106,7 @@ class Network(dict):
 
     def boundary(self):
         all_points = self.indexes
-        boundary_points = spatial.ConvexHull(self.points).vertices
+        boundary_points = spatial.ConvexHull(Delaunay.drop_coplanar(self.points)).vertices
         return np.in1d(all_points, boundary_points).astype(bool)
 
     def save(self, filename):
@@ -283,14 +283,12 @@ class Delaunay(Network):
         return cls(points)
 
     def __init__(self, points, mask=None):
+        self.pairs = self.edges_from_points(self.drop_coplanar(points))
         self.points = np.atleast_2d(points)
-        self.pairs = self.edges_from_points(points)
 
     @staticmethod
     def edges_from_points(points, mask=None):
-        non_coplanar_cols = np.diff(points, axis=0).sum(axis=0).nonzero()
-        non_coplanar_points = points.T[non_coplanar_cols].T
-        triangulation = spatial.Delaunay(non_coplanar_points)
+        triangulation = spatial.Delaunay(points)
         edges = set()
         for unindexed in triangulation.vertices:
             indexed = mask[unindexed] if mask else unindexed
@@ -302,6 +300,11 @@ class Delaunay(Network):
                     edges.add(edge)
 
         return np.array(list(edges))
+
+    @staticmethod
+    def drop_coplanar(points):
+        not_coplanar = np.diff(points, axis=0).sum(axis=0).nonzero()
+        return points.T[not_coplanar].T
 
 
 class PackedSpheres(Network):

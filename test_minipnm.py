@@ -109,6 +109,12 @@ def test_merge():
     inside, outside = network.split(network.boundary())
     (inside | outside)
 
+def test_qhull_coplanar():
+    points = np.random.rand(100,3)
+    points.T[2] = 0
+    network = mini.Delaunay(points)
+    network.boundary()
+
 if __name__ == '__main__':
     errors = pytest.main([__file__])
     os.system("find . -name '*.pyc' -delete")
