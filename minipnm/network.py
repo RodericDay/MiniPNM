@@ -2,6 +2,7 @@ from __future__ import division, absolute_import
 import os
 import itertools
 import numpy as np
+import traceback
 from scipy import spatial, sparse
 
 from .graphics import Scene
@@ -113,12 +114,20 @@ class Network(dict):
         self.filename = filename
 
     def render(self, values=None, *args, **kwargs):
-        if values is not None:
+        try:
+            # to load as if given a key
+            values = self[values]
+        except KeyError:
+            # show error, but plot anyway (fail gracefully?)
+            traceback.print_exc()
+            values = None
+        except TypeError:
+            # probably an array, but make sure it fits!
             assert np.array(values).shape[-1] == self.order
-
-        scene = Scene()
-        scene.add_wires(self.points, self.pairs, values)
-        scene.play()
+        finally:
+            scene = Scene()
+            scene.add_wires(self.points, self.pairs, values)
+            scene.play()
 
     def merge(self, other, axis=2, spacing=None, centering=False, stitch=False):
         new = Network()
@@ -140,8 +149,7 @@ class Network(dict):
         new.points = np.vstack([self.points, shifted_points])
 
         # push the connectivity array by the number of already existing vertices
-        Va, Ea = self.size
-        new.pairs = np.vstack([self.pairs, other.pairs+Va])
+        new.pairs = np.vstack([self.pairs, other.pairs+self.order])
 
         # merge the rest
         for key in set(self.keys()+other.keys())-{'x','y','z','heads','tails'}:

@@ -104,6 +104,11 @@ def test_handling_of_pseudo_array_input():
     network.pairs = (0,1)
     network.pairs = [(1,2), [2,0]]
 
+def test_merge():
+    network = mini.Delaunay.random(100)
+    inside, outside = network.split(network.boundary())
+    (inside | outside)
+
 if __name__ == '__main__':
     errors = pytest.main([__file__])
     os.system("find . -name '*.pyc' -delete")
