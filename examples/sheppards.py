@@ -23,7 +23,7 @@ network = mini.Cubic(im, im.shape) - (im==1)
 network = mini.radial_join(network, pores)
 elecs = []
 for submask in saturations:
-    mask = np.zeros(network.size[0], dtype=bool)
+    mask = np.zeros(network.order, dtype=bool)
     mask[-len(submask):] = ~submask.astype(bool)
     temp = network - mask
     x,y,z = temp.coords
