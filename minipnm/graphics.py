@@ -120,6 +120,11 @@ class Scene(object):
         polydata = vtk.vtkPolyData()
         polydata.SetPoints(vpoints(points))
 
+        try:
+            assert len(points) == np.array(radii).shape[-1]
+        except IndexError:
+            # probably a scalar, so broadcast
+            radii = np.ones(len(points))*radii
         looper = cycle(np.atleast_2d(radii))
         self.animation_batch.append(
             lambda: polydata.GetPointData().SetScalars(
