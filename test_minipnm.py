@@ -115,6 +115,22 @@ def test_qhull_coplanar():
     network = mini.Delaunay(points)
     network.boundary()
 
+def test_sphere_stuff():
+    N = 20
+    x = np.arange(-N,N)
+    y = np.arange(-N,N)
+    X,Y = np.meshgrid(x,y)
+    Z = np.sqrt(X**2 + Y**2)
+    im = Z < Z.mean()
+
+    network = mini.Cubic(im, im.shape)
+    network = network - im
+
+    centers, radii = mini.extract_spheres(im)
+    sphere = mini.PackedSpheres(centers, radii)
+
+    stitched = mini.binary.radial_join(network, sphere)
+
 if __name__ == '__main__':
     errors = pytest.main([__file__])
     os.system("find . -name '*.pyc' -delete")
