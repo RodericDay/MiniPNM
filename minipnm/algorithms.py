@@ -97,32 +97,32 @@ def volumetric(network, sources, capacities, sinks=None, f=1, resolution=100):
 
     bucket_size = sum(capacities)/resolution
     bucket = bucket_size
-    real = volumes[-1]
+    fvpp = volumes[-1] # fluid volume per pore
     # exit condition: full network
     while (capacities-volumes[-1]).sum() > 0:
 
         # determine relevant indexes
-        source_like = np.true_divide(real,capacities)>=f # full enough to share
+        source_like = np.true_divide(fvpp,capacities)>=f # full enough to share
         boundary = np.unique(network.cut(source_like, network.indexes))
         i = sources | source_like | np.in1d(network.indexes, boundary)
 
-        vvpp = (capacities-real)[i] # void volume per pore
+        vvpp = (capacities-fvpp)[i] # void volume per pore
         # exit condition: nowhere to go
         if vvpp.sum() == 0:
-            volumes.append(real)
+            volumes.append(fvpp)
             break
 
         rvvpp = vvpp / vvpp.sum() # relative vvpp
 
-        temp = real.copy()
+        temp = fvpp.copy()
         temp[i] += bucket * rvvpp
 
         # handle possible overflow
-        real = np.clip(temp, a_min=0, a_max=capacities)
-        bucket = (temp - real).sum()
+        fvpp = np.clip(temp, a_min=0, a_max=capacities)
+        bucket = (temp - fvpp).sum()
 
         if bucket == 0:
-            volumes.append(real)
+            volumes.append(fvpp)
             bucket = bucket_size
 
     return volumes
