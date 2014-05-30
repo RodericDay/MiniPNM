@@ -90,3 +90,39 @@ def invasion(network, sources, thresholds, sinks=None):
         saturation.append(new_saturation)
 
     return np.vstack(saturation)
+
+def volumetric(network, sources, capacities, sinks=None, f=1, resolution=100):
+    # start with an empty network
+    volumes = [np.zeros_like(capacities)]
+
+    bucket_size = sum(capacities)/resolution
+    bucket = bucket_size
+    real = volumes[-1]
+    # exit condition: full network
+    while (capacities-volumes[-1]).sum() > 0:
+
+        # determine relevant indexes
+        source_like = np.true_divide(real,capacities)>=f # full enough to share
+        boundary = np.unique(network.cut(source_like, network.indexes))
+        i = sources | source_like | np.in1d(network.indexes, boundary)
+
+        vvpp = (capacities-real)[i] # void volume per pore
+        # exit condition: nowhere to go
+        if vvpp.sum() == 0:
+            volumes.append(real)
+            break
+
+        rvvpp = vvpp / vvpp.sum() # relative vvpp
+
+        temp = real.copy()
+        temp[i] += bucket * rvvpp
+
+        # handle possible overflow
+        real = np.clip(temp, a_min=0, a_max=capacities)
+        bucket = (temp - real).sum()
+
+        if bucket == 0:
+            volumes.append(real)
+            bucket = bucket_size
+
+    return volumes
