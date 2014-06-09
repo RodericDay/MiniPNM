@@ -42,15 +42,7 @@ class Scene(object):
 
     def __init__(self, size=(800,600)):
         self.ren = vtk.vtkRenderer()
-        self.renWin = vtk.vtkRenderWindow()
-        self.renWin.SetSize(*size)
-        self.renWin.AddRenderer(self.ren)
-        self.iren = vtk.vtkRenderWindowInteractor()
-        self.iren.SetRenderWindow(self.renWin)
-        style = vtk.vtkInteractorStyleTrackballCamera()
-        self.iren.SetInteractorStyle(style)
-        self.iren.Initialize()
-        self.iren.AddObserver('TimerEvent', self.timeout)
+        self.style = vtk.vtkInteractorStyleTrackballCamera()
         self.animation_batch = []
 
     def map_and_append(fn):
@@ -154,9 +146,19 @@ class Scene(object):
         self.ren.ResetCameraClippingRange()
         self.renWin.Render()
 
-    def play(self, rate=1):
+    def play(self, rate=1, size=(800,600)):
+        self.renWin = vtk.vtkRenderWindow()
+        self.renWin.SetSize(*size)
+        self.renWin.AddRenderer(self.ren)
+        self.iren = vtk.vtkRenderWindowInteractor()
+        self.iren.SetRenderWindow(self.renWin)
+        self.iren.SetInteractorStyle(self.style)
+        self.iren.Initialize()
+        self.iren.AddObserver('TimerEvent', self.timeout)
+
         if rate:
             timer = self.iren.CreateRepeatingTimer(rate)
+        
         self.iren.Start()
 
     def save(self, size=(400,300), frames=1):
