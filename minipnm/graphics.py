@@ -1,4 +1,4 @@
-from __future__ import print_function
+from __future__ import print_function, division
 import os
 from itertools import cycle
 import numpy as np
@@ -85,7 +85,7 @@ class Scene(object):
         return polydata
 
     @map_and_append
-    def add_tubes(self, points, pairs, history=None, radius=1, detail=5,
+    def add_tubes(self, points, pairs, history=None, radius=None, detail=5,
                   cmap='coolwarm'):
         polydata = vtk.vtkPolyData()
         polydata.SetPoints(vpoints(points))
@@ -97,6 +97,11 @@ class Scene(object):
                 lambda: polydata.GetPointData().SetScalars(
                         vcolors(next(looper), cmap))
             )
+
+        if radius is None:
+            # we don't want chunky tubes
+            lmin = np.linalg.norm(np.diff(points[pairs], axis=1), axis=2).min()
+            radius = lmin/10
 
         tubeFilter = vtk.vtkTubeFilter()
         tubeFilter.SetInput(polydata)
