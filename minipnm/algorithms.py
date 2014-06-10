@@ -2,7 +2,7 @@ import numpy as np
 from scipy import linalg, sparse
 from scipy.sparse.linalg import spsolve
 
-def linear_solve(network, dbcs):
+def linear_solve(network, dbcs, cmat=None):
     # the matrix to be solved will involve a stack of ICs and some balances
     # take as fixed the points where dbcs is defined
     fixed = dbcs!=0
@@ -17,8 +17,8 @@ def linear_solve(network, dbcs):
 
     # we build a diagonal matrix for dbcs
     IC= sparse.diags(np.ones_like(dbcs), 0).tocsr()
-    # a connectivity matrix representing sources
-    C = network.connectivity_matrix
+    # a connectivity matrix representing conductivity
+    C = cmat if cmat is not None else network.connectivity_matrix
     # and a diagonal matrix representing sinks, as sum of sources
     D = sparse.diags(C.sum(axis=1).A1, 0).tocsr() # A1 is matrix -> array
     # the system matrix is a stack of the relevant rows of each

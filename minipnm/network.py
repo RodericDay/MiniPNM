@@ -135,7 +135,8 @@ class Network(dict):
             assert np.array(values).shape[-1] == self.order
         finally:
             scene = Scene()
-            scene.add_wires(self.points, self.pairs, values)
+            cmap = kwargs.get('cmap', None)
+            scene.add_wires(self.points, self.pairs, values, cmap)
             scene.play()
 
     def merge(self, other, axis=2, spacing=None, centering=False, stitch=False):
