@@ -1,17 +1,20 @@
+from __future__ import division
 import numpy as np
 import minipnm as mini
 
-N = 20
-x = np.arange(-N,N)
-y = np.arange(-N,N)
-X,Y = np.meshgrid(x,y)
-Z = np.sqrt(X**2 + Y**2)
-im = Z < Z.mean()
+N = 3
+im = np.ones([N,N,N], dtype=bool)
+for i in [i for i, c in np.ndenumerate(im) if np.linalg.norm(np.subtract(i, N/2-0.5))>N/2.5]:
+    im[i] = 0
 
 network = mini.Cubic(im, im.shape)
+print network.points[0]
+print network.dims
 network = network - im
 
 centers, radii = mini.extract_spheres(im)
+print centers
+
 sphere = mini.PackedSpheres(centers, radii)
 
 stitched = mini.binary.radial_join(network, sphere)

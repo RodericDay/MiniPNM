@@ -68,6 +68,10 @@ class Network(dict):
         del self['tails']
 
     @property
+    def lengths(self):
+        return np.linalg.norm(np.diff(self.points[self.pairs], axis=1), axis=2).astype('float16')
+
+    @property
     def connectivity_matrix(self):
         heads, tails = self.pairs.T
         fwds = np.hstack([tails, heads])
@@ -89,8 +93,12 @@ class Network(dict):
 
     @property
     def dims(self):
-        w = self['x'].max() - self['x'].min()
-        h = self['y'].max() - self['y'].min()
+        '''
+        the `or 1` hack is somewhat ugly, but is a reasonable way to handle
+        unit-thin networks. 
+        '''
+        w = self['x'].max() - self['x'].min() or 1
+        h = self['y'].max() - self['y'].min() or 1
         t = self['z'].max() - self['z'].min() or 1
         return np.array([w, h, t])
 

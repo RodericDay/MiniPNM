@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 from __future__ import division
 import os
+import itertools as it
 
 import pytest
 import numpy as np
@@ -15,6 +16,16 @@ def disabled_test_save_load_of_vtp_file():
         assert (original_array - loaded_array<1E6).all()
     assert( len(network) == 0 )
     os.system("find . -name 'test.vtp' -delete")
+
+def test_basic_cubic():
+    '''
+    this is actually wrong
+    '''
+    R = np.zeros([2,2,2])
+    network = mini.Cubic(R, R.shape)
+    expected = [    [0,0,0], [0,0,2], [0,2,0], [0,2,2],
+                    [2,0,0], [2,0,2], [2,2,0], [2,2,2], ]
+    assert np.allclose(expected, network.points)
 
 def test_prune():
     delaunay = mini.Delaunay(np.random.rand(100,3))
@@ -130,6 +141,13 @@ def test_sphere_stuff():
     sphere = mini.PackedSpheres(centers, radii)
 
     stitched = mini.binary.radial_join(network, sphere)
+
+def test_lengths():
+    # create a voxelized sphere. black (1s) is void.
+    N = 13
+    im = np.ones([N,N,N])
+    for i in [i for i, c in np.ndenumerate(im) if np.linalg.norm(np.subtract(i, N/2-0.5))>N/2.5]:
+        im[i] = 0
 
 if __name__ == '__main__':
     errors = pytest.main([__file__])
