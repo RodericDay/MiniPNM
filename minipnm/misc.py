@@ -41,3 +41,10 @@ def extract_spheres(im):
     centers = [ndimage.center_of_mass(labels==i) for i in range(1, num_maxima+1)]
     radii = [data[center] for center in centers]
     return np.array(centers), np.array(radii)
+
+def distances_to_nearest_neighbors(network):
+    output = np.ones(network.order)
+    for (t,h), d in zip(network.pairs, network.lengths):
+        output[h] = min(output[h], d)
+        output[t] = min(output[t], d)
+    return output
