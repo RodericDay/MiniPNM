@@ -1,10 +1,22 @@
 import gzip
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy import misc, ndimage
 
 '''
 utils houses software developer tools and helpers
 '''
+def imread(path_or_ndarray, zoom=0.1):
+    try:
+        im = misc.imread(path_or_ndarray)
+    except AttributeError:
+        im = path_or_ndarray
+    # check if the image is just a stack of sames
+    if not np.any(im - np.dstack([im[:,:,0]]*im.shape[-1])):
+        im = im[:,:,0]
+    im = ndimage.zoom(im, zoom, order=1)
+    im = im.transpose()
+    return im.squeeze()
 
 class FormulaDict(dict):
     '''
