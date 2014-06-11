@@ -42,9 +42,17 @@ def extract_spheres(im):
     radii = [data[center] for center in centers]
     return np.array(centers), np.array(radii)
 
-def distances_to_nearest_neighbors(network):
-    output = np.ones(network.order)
+def distances_to_neighbors(network):
+    output = [[] for i in range(network.order)]
     for (t,h), d in zip(network.pairs, network.lengths):
-        output[h] = min(output[h], d)
-        output[t] = min(output[t], d)
+        output[h].append(d)
+        output[t].append(d)
     return output
+
+def filtered_distances(network, _filter, default):
+    all_distances = distances_to_neighbors(network)
+    distances = np.array([_filter(row) if row else default for row in all_distances])
+    return distances.squeeze()
+
+distances_to_nearest_neighbors = lambda network: filtered_distances(network, min, 1E-6)
+distances_to_furthest_neighbors = lambda network: filtered_distances(network, max, np.inf)
