@@ -163,7 +163,7 @@ class Scene(object):
 
         if rate:
             timer = self.iren.CreateRepeatingTimer(rate)
-        
+        self.timeout()
         self.iren.Start()
 
     def save(self, size=(400,300), frames=1):
