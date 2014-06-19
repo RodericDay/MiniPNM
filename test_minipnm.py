@@ -149,6 +149,10 @@ def test_lengths():
     for i in [i for i, c in np.ndenumerate(im) if np.linalg.norm(np.subtract(i, N/2-0.5))>N/2.5]:
         im[i] = 0
 
+def test_poisson():
+    pdf = (np.random.normal(3) if i%3!=2 else np.random.normal(8) for i in it.count())
+    network = mini.Poisson(pdf, [30,30,10])
+
 if __name__ == '__main__':
     errors = pytest.main([__file__])
     os.system("find . -name '*.pyc' -delete")
