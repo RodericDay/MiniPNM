@@ -16,11 +16,11 @@ def normalize(array):
     array = np.true_divide(array, array.max())
     return array
 
-def gaussian_noise(dims):
+def gaussian_noise(dims, exp=0.5):
     R = np.random.random(dims)
     N = np.zeros_like(R)
     for i in 2**np.arange(6):
-        N += ndimage.filters.gaussian_filter(R, i) * i**0.5
+        N += ndimage.filters.gaussian_filter(R, i) * i**exp
     N = normalize(N)
     return N
 
