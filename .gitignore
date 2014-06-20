@@ -4,4 +4,4 @@ kernprof.py
 *.pyc
 .DS_STORE
 minipnm.egg-info/
-scratch.py
+scratch*
