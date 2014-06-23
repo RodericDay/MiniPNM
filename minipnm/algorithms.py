@@ -126,3 +126,51 @@ def volumetric(network, sources, capacities, sinks=None, f=1, resolution=100):
             bucket = bucket_size
 
     return volumes
+
+def shortest_path(cmat, start=None, end=None, heuristic=lambda i: 0, return_all=False):
+    '''
+    finds the shortest path in a graph, given edge costs. can start at any
+    point in [start] and end at any point in [end]
+    '''
+    if start is None:
+        start = (0,)
+    if end is None:
+        end = (cmat.col.max(),)
+
+    reached = set(start)
+    exhausted = set()
+    vertex_costs = np.inf * np.ones(cmat.col.max()+1)
+    vertex_costs[start] = 0
+
+    while not all(i in exhausted for i in end):
+        # source vertex index, where source is the lowest cost vertex available
+        estimate = lambda i: vertex_costs[i] + heuristic(i)
+        si = lowest_cost_index = min(reached, key=estimate)
+        source_cost = vertex_costs[si]
+
+        # examine adjacent paths by index
+        for pi in (cmat.row==si).nonzero()[0]: # ensure target not exhausted?
+            ni = neighbor_index = cmat.col[pi]
+            if ni in exhausted:
+                continue
+            reached.add(ni)
+
+            travel_cost = cmat.data[pi]
+            vertex_costs[ni] = min(vertex_costs[ni], source_cost+travel_cost)
+
+        reached.remove(si)
+        exhausted.add(si)
+
+    # reconstruct path
+    best_exit = min(end, key=vertex_costs.item)
+    path = [best_exit]
+    while not any(i in path for i in start):
+        parents = cmat.row[cmat.col==path[-1]]
+        best_parent = min(parents, key=vertex_costs.item)
+        path.append(best_parent)
+    path.reverse()
+
+    if not return_all:
+        return path
+
+    return {'main':path, 'reached':list(reached), 'exhausted':list(exhausted-set(path))}
