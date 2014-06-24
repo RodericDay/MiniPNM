@@ -423,4 +423,5 @@ class Bridson(Network):
     def render(self):
         scene = Scene()
         scene.add_spheres(self.points, self['radii'], color=(0,0,1))
+        scene.add_tubes(self.points, self.pairs)
         scene.play()
