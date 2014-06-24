@@ -11,7 +11,7 @@ candidates = (0.4 < x) & (x < 0.6)
 sources = np.zeros_like(x, dtype=bool)
 sources[np.random.choice(candidates.nonzero()[0], 5)] = 1
 
-sinks = (x < np.percentile(x,5)) #| (x > np.percentile(x,95))
+sinks = (x < np.percentile(x,1)) #| (x > np.percentile(x,95))
 
 radii = mini.distances_to_nearest_neighbors(network)/2
 
