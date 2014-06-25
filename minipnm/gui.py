@@ -28,39 +28,20 @@ class Sphere(vtk.vtkActor):
     def __str__(self):
         return "{} #{:0>3}".format(self.__class__.__name__, self.id)
 
-class RenderedItemsModel(QtCore.QAbstractItemModel):
-
-    def __init__(self, renderer, parent=None):
-        super(RenderedItemsModel, self).__init__(parent)
-        self.ren = renderer
-
-    def index(self, row, column, parent):
-        return self.createIndex(row, column)
-
-    def parent(self, index):
-        return self.createIndex(1, 0)
-
-    def rowCount(self, parent):
-        return self.ren.GetActors().GetReferenceCount()
-
-    def columnCount(self, parent):
-        return 1
-
-    def data(self, index, role):
-        if role == QtCore.Qt.DisplayRole and index.column() == 0:
-            return str(self.ren.GetActors().GetItemAsObject(index.row()))
-        return None
-
 class MainWindow(QtGui.QMainWindow):
 
     def __init__(self, parent=None):
         QtGui.QMainWindow.__init__(self, parent)
 
+        self.initToolBar()
         self.initVtk() # the show command is called here, before vtk initialize
         self.initPlot()
-        self.initTree()
-        self.initToolBar()
+        # self.initTree()
         self.statusBar().showMessage("Ready")
+
+    def initToolBar(self):
+        self.toolBar = QtGui.QToolBar(self)
+        self.addToolBar(self.toolBar)
 
     def initVtk(self):
         self.frame = QtGui.QFrame()
@@ -86,21 +67,15 @@ class MainWindow(QtGui.QMainWindow):
         self.plotDockWidget.setFeatures(QtGui.QDockWidget.DockWidgetClosable)
         self.plotDockWidget.setWidget(self.plotWidget)
         self.addDockWidget(QtCore.Qt.BottomDockWidgetArea, self.plotDockWidget)
+        self.toolBar.addAction(self.plotDockWidget.toggleViewAction())
 
     def initTree(self):
-        self.treeModel = RenderedItemsModel(self.ren, self)
         self.treeView = QtGui.QTreeView(self)
-        self.treeView.setModel(self.treeModel)
         self.treeDockWidget = QtGui.QDockWidget("Tree", self)
         self.treeDockWidget.setFeatures(QtGui.QDockWidget.DockWidgetClosable)
         self.treeDockWidget.setWidget(self.treeView)
         self.addDockWidget(QtCore.Qt.LeftDockWidgetArea, self.treeDockWidget)
         self.setCorner(QtCore.Qt.BottomLeftCorner, QtCore.Qt.LeftDockWidgetArea)
-
-    def initToolBar(self):
-        self.toolBar = QtGui.QToolBar(self)
-        self.addToolBar(self.toolBar)
-        self.toolBar.addAction(self.plotDockWidget.toggleViewAction())
         self.toolBar.addAction(self.treeDockWidget.toggleViewAction())
 
     def addActor(self, actor):
@@ -123,20 +98,32 @@ class MainWindow(QtGui.QMainWindow):
         self.iren.Render()
 
 
-def create_2d_data():
-    x = np.linspace(0,1,1000)
-    y = np.sin(x)
-    return x, y
-
 def debug():
-    window.treeDockWidget.hide()
-    window.addActor(Sphere())
-    window.addActor(Sphere((1,2,3)))
-    window.plotXY(*create_2d_data())
-
-if __name__ == "__main__":
     import sys
+    import minipnm as mini
+
+    pdf = (np.random.weibull(3) for _ in count())
+    network = mini.Bridson(pdf, [50,50,5])
+    network.pairs = mini.Delaunay.edges_from_points(network.points)
+
+    x,y,z = network.coords
+    source = x==x.min()
+    history = mini.invasion(network, source, 1./network['radii'])
+
+    wires = mini.Wires(network.points, network.pairs)
+    spheres = mini.Spheres(network.points, network['radii'] * history)
+
     app = QtGui.QApplication(sys.argv)
     window = MainWindow()
-    debug()
+    window.addActor(wires)
+    window.addActor(spheres)
+
+    x = np.arange(len(history))
+    y = (network['radii'] * history).sum(axis=1)
+    window.plotXY(x,y)
+    
     sys.exit(app.exec_())
+
+
+if __name__ == "__main__":
+    debug()
