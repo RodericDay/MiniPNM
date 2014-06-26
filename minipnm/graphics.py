@@ -35,7 +35,7 @@ class Actor(vtk.vtkActor):
         colors = vtk.vtkUnsignedCharArray()
         colors.SetNumberOfComponents(3)
         if cmap is None:
-            cmap = 'copper'
+            cmap = 'coolwarm'
         colormap = cm.get_cmap(cmap)
         mapped = colormap(array)
         for r,g,b,a in 255*mapped:
@@ -57,13 +57,14 @@ class Wires(Actor):
         self.SetMapper(self.mapper)
 
         if vertex_weights is None:
-            weights = np.atleast_2d([256 for _ in vertex_coords])
+            weights = np.atleast_2d([128 for _ in vertex_coords])
         else:
             weights = np.atleast_2d(vertex_weights)
             weights = np.subtract(weights, weights.min())
             weights = np.true_divide(weights, weights.max())
         self.weights = weights
         self.cmap = cmap
+        self.update()
 
         self.GetProperty().SetOpacity(alpha)
 
@@ -74,7 +75,7 @@ class Wires(Actor):
 
 class Spheres(Actor):
 
-    def __init__(self, centers, radii=None, alpha=1, color=(1,1,1)):
+    def __init__(self, centers, radii, alpha=1, color=(1,1,1)):
         self.polydata = vtk.vtkPolyData()
         self.polydata.SetPoints(self.pointArray(centers))
         self.radii = np.atleast_2d(radii)
@@ -170,7 +171,7 @@ if __name__ == '__main__':
     scene.add_actor(wires)
     scene.add_actor(shells)
     scene.add_actor(spheres)
-    scene.play(100)
+    scene.play(10)
 
 
 #~~
