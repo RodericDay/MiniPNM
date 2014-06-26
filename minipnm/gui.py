@@ -5,28 +5,6 @@ import pyqtgraph as QtGraph
 import vtk
 from vtk.qt4.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor
 
-class Sphere(vtk.vtkActor):
-    _ids = count(1)
-
-    def __init__(self, center=(0,0,0), radius=1):
-        self.id = self._ids.next()
-
-        # Create source
-        source = vtk.vtkSphereSource()
-        source.SetCenter(*center)
-        source.SetRadius(radius)
-
-        # Create a mapper
-        mapper = vtk.vtkPolyDataMapper()
-        mapper.SetInputConnection(source.GetOutputPort())
-
-        self.SetMapper(mapper)
-
-    def update(self, t):
-        self.GetProperty().SetOpacity(t)
-
-    def __str__(self):
-        return "{} #{:0>3}".format(self.__class__.__name__, self.id)
 
 class MainWindow(QtGui.QMainWindow):
 
@@ -103,7 +81,7 @@ def debug():
     import minipnm as mini
 
     pdf = (np.random.weibull(3) for _ in count())
-    network = mini.Bridson(pdf, [50,50,5])
+    network = mini.Bridson(pdf, [50,50,2])
     network.pairs = mini.Delaunay.edges_from_points(network.points)
 
     x,y,z = network.coords
@@ -111,7 +89,7 @@ def debug():
     history = mini.invasion(network, source, 1./network['radii'])
 
     wires = mini.Wires(network.points, network.pairs)
-    spheres = mini.Spheres(network.points, network['radii'] * history)
+    spheres = mini.Spheres(network.points, network['radii'] * history, color=(0,0,1))
 
     app = QtGui.QApplication(sys.argv)
     window = MainWindow()
