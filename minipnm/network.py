@@ -75,20 +75,27 @@ class Network(dict):
         return np.linalg.norm(np.diff(self.points[self.pairs], axis=1), axis=2).astype('float16')
 
     @property
-    def connectivity_matrix(self):
-        heads, tails = self.pairs.T
-        fwds = np.hstack([tails, heads])
-        bkds = np.hstack([heads, tails])
-        return sparse.coo_matrix((np.ones_like(fwds), (fwds, bkds)),
-                                 shape=(self.order, self.order))
+    def adjacency_matrix(self):
+        tails, heads = self.pairs.T
+        ijk = np.ones_like(tails), (tails, heads)
+        return sparse.coo_matrix(ijk, shape=(self.order, self.order))
+
+    @property
+    def laplacian(self):
+        '''
+        this is the graph theory version of the Laplacian matrix
+        '''
+        A = self.adjacency_matrix
+        D = sparse.diags(A.sum(axis=1).A1, 0)
+        return D - A
     
     @property
     def labels(self):
-        return sparse.csgraph.connected_components(self.connectivity_matrix)[1]
+        return sparse.csgraph.connected_components(self.adjacency_matrix)[1]
 
     @property
     def clusters(self):
-        return sparse.csgraph.connected_components(self.connectivity_matrix)[0]
+        return sparse.csgraph.connected_components(self.adjacency_matrix)[0]
 
     @property
     def order(self):
@@ -178,13 +185,16 @@ class Network(dict):
         return new
 
     def cut(self, mask, values=None):
-        ''' returns id of throats where the head and the tail are on opposite
-            sides of the mask. if a value array is given, instead of returning
-            indices, the corresponding values are returned
+        '''
+        returns id of throats where the the tail is masked and the head is not.
+        (ie: True for sources).
+
+        for convenience, if a value array is given, the corresponding values
+        are returned instead of indices 
         '''
         imask = self.indexes[np.array(mask).nonzero()]
         heads, tails = self.pairs.T
-        pair_mask = np.in1d(heads, imask) != np.in1d(tails, imask)
+        pair_mask = np.in1d(heads, imask) & ~np.in1d(tails, imask)
         if values is None:
             return pair_mask.nonzero()[0] # 1 dimension only
         else:
@@ -267,15 +277,17 @@ class Cubic(Network):
         self.points = points_abs
 
         I = np.arange(ndarray.size).reshape(ndarray.shape)
-        heads, tails = [], []
-        for A,B in [
+        tails, heads = [], []
+        for T,H in [
             (I[:,:,:-1], I[:,:,1:]),
             (I[:,:-1], I[:,1:]),
             (I[:-1], I[1:]),
             ]:
-            heads.extend(A.flat)
-            tails.extend(B.flat)
-        self.pairs = np.vstack([heads, tails]).T
+            tails.extend(T.flat)
+            tails.extend(H.flat)
+            heads.extend(H.flat)
+            heads.extend(T.flat)
+        self.pairs = np.vstack([tails, heads]).T
 
     @property
     def resolution(self):
@@ -317,7 +329,9 @@ class Delaunay(Network):
                 if edge not in edges:
                     edges.add(edge)
 
-        return np.array(list(edges))
+        one_way = np.array(list(edges))
+        other_way = np.fliplr(one_way)
+        return np.vstack([one_way, other_way])
 
     @staticmethod
     def drop_coplanar(points):

@@ -27,8 +27,8 @@ for submask in saturations:
     mask[-len(submask):] = ~submask.astype(bool)
     temp = network - mask
     x,y,z = temp.coords
-    dbcs = 3*(x==x.min()) + 1*(x==x.max())
-    sol = mini.linear_solve(temp, dbcs)
+    dbcs = { 3 : (x==x.min()), 1 : (x==x.max()) }
+    sol = mini.solve_bvp(temp.laplacian, dbcs)
 
     expanded = np.zeros_like(mask, dtype=float)
     expanded[~mask] = sol
@@ -41,4 +41,4 @@ scene.add_tubes(pores.points, pores.pairs, saturations, alpha=0.7, cmap='Blues')
 scene.add_spheres(pores.points, pores['radii'], alpha=0.1, color=(1,1,1))
 scene.add_spheres(pores.points, pores['radii']*saturations, color=(0.2,0.3,0.8))
 # scene.save(frames=len(saturations))
-scene.play(rate=100)
+scene.play()

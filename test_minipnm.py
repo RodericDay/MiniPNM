@@ -62,11 +62,11 @@ def test_linear_solver():
     x,y,z = network.coords
     l = x == x.min()
     r = x == x.max()
-    dbcs = 2*l + 1*r
-    sol = mini.linear_solve(network, dbcs)
+    dbcs = { 2 : l, 1 : r }
+    sol = mini.solve_bvp(network.laplacian, dbcs)
 
     l_flux = np.diff(network.cut(l, sol)).sum()
-    r_flux = np.diff(network.cut(r, sol)).sum()
+    r_flux = -np.diff(network.cut(r, sol)).sum()
     assert np.allclose(l_flux, r_flux)
 
 def test_subtract_all():

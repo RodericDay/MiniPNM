@@ -1,32 +1,48 @@
+from collections import Counter
 import numpy as np
 from scipy import linalg, sparse
 from scipy.sparse.linalg import spsolve
 
-def linear_solve(network, dbcs, cfn=None):
-    # the matrix to be solved will involve a stack of ICs and some balances
-    # take as fixed the points where dbcs is defined
-    fixed = dbcs!=0
+def solve_bvp(laplacian, dirichlet, neumann={}):
+    '''
+    boundary conditions given as dictionaries of { value : mask }
+    the length of the Dirichlet masks should be of network.order,
+    while Neumann masks are the indices of specified edge gradients
 
-    # if there are unconnected islands, they need to be fixed at zero too
-    labels = network.labels
-    island_labels = set(labels[~fixed]) - set(labels[fixed])
-    fixed = fixed | np.in1d(labels, list(island_labels))
+    example:
+    >>> dirichlet = { 1 : x == x.min() }
+    >>> neumann = { 5 : network.cut(x == x.max(), network.indexes).T }
+    '''
+    n_conditions_imposed = sum(dirichlet.values())
+    for source_like,sink_like in neumann.values():
+        # this basically replaces each value by its count
+        # ie. [a a b a c b] = [3 3 2 3 1 2]
+        ids, counts = [np.array(l) for l in zip(*Counter(source_like).items())]
+        n_conditions_imposed[ids] += counts
+    if any(n_conditions_imposed > 1):
+        raise Exception("Overlapping BCs")
 
-    # this array shifts the ICs around in the correct way
-    mapping = np.hstack(fixed.nonzero()+(~fixed).nonzero())
+    _, membership = sparse.csgraph.connected_components(laplacian)
+    isolated = set(membership[n_conditions_imposed==0]) - set(membership[n_conditions_imposed>0])
+    print isolated
+    dirichlet[0] = dirichlet.get(0, np.zeros_like(membership)) | np.in1d(membership, list(isolated))
+    n_conditions_imposed[list(isolated)] += 1
 
-    # we build a diagonal matrix for dbcs
-    IC= sparse.diags(np.ones_like(dbcs), 0).tocsr()
-    # a connectivity matrix representing conductivity
-    C = network.connectivity_matrix if cfn is None else cfn(network)
-    # and a diagonal matrix representing sinks, as sum of sources
-    D = sparse.diags(C.sum(axis=1).A1, 0).tocsr() # A1 is matrix -> array
-    # the system matrix is a stack of the relevant rows of each
-    A = sparse.vstack([(IC)[fixed], (C - D)[~fixed]]).tocsr()
-    x = spsolve(A, dbcs[mapping])
+    free = n_conditions_imposed == 0
+    D = sparse.eye(laplacian.shape[0]).tocsr()
+    elements_of_A, elements_of_b = [laplacian[free]], [np.zeros(free.sum())]
 
-    assert( np.allclose(x[fixed], dbcs[fixed]) )
+    for value, mask in dirichlet.items():
+        elements_of_A.append( D[mask.nonzero()] )
+        elements_of_b.append( value * np.ones(mask.sum()) )
 
+    for v,(t,h) in neumann.items():
+        elements_of_A.append( (D[t] - D[h]).todense() )
+        elements_of_b.append( np.true_divide(v, t.size) * np.ones_like(t) )
+
+    A = sparse.vstack(elements_of_A).tocsr()
+    b = np.hstack(elements_of_b)
+    x = spsolve(A, b).round(5)
     return x
 
 def percolation(network, sources, thresholds, condition_range,
