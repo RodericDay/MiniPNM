@@ -65,7 +65,7 @@ class Wires(Actor):
         self.weights = weights
         self.cmap = cmap
         self.update()
-
+        
         self.GetProperty().SetOpacity(alpha)
 
     def update(self, t=0):

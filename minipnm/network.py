@@ -143,7 +143,8 @@ class Network(dict):
         finally:
             scene = Scene()
             cmap = kwargs.get('cmap', None)
-            scene.add_wires(self.points, self.pairs, values, cmap)
+            alpha = kwargs.get('alpha', 1)
+            scene.add_wires(self.points, self.pairs, values, alpha=alpha, cmap=cmap)
             scene.play()
 
     def merge(self, other, axis=2, spacing=None, centering=False, stitch=False):
