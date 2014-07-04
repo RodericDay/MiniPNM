@@ -73,6 +73,38 @@ class Wires(Actor):
         self.polydata.GetPointData().SetScalars(self.colorArray(self.weights[i], self.cmap))
 
 
+class Tubes(Wires):
+
+    def __init__(self, vertex_coords, edge_pairs, vertex_weights=None, alpha=1, cmap=None):
+        self.polydata = vtk.vtkPolyData()
+        self.polydata.SetPoints(self.pointArray(vertex_coords))
+        self.polydata.SetLines(self.lineArray(edge_pairs))
+
+        self.tubeFilter = vtk.vtkTubeFilter()
+        self.tubeFilter.SetInput(self.polydata)
+        self.tubeFilter.SetRadius(0.1)
+        self.tubeFilter.SetNumberOfSides(5)
+
+        self.mapper = vtk.vtkPolyDataMapper()
+        self.mapper.SetInputConnection(self.tubeFilter.GetOutputPort())
+        self.SetMapper(self.mapper)
+
+        if vertex_weights is None:
+            weights = np.atleast_2d([128 for _ in vertex_coords])
+        else:
+            weights = np.atleast_2d(vertex_weights)
+            weights = np.subtract(weights, weights.min())
+            weights = np.true_divide(weights, weights.max())
+        self.weights = weights
+        self.cmap = cmap
+        self.update()
+
+        self.GetProperty().SetOpacity(alpha)
+
+    def update(self, t=0):
+        i = t % len(self.weights)
+        self.polydata.GetPointData().SetScalars(self.colorArray(self.weights[i], self.cmap))
+
 class Spheres(Actor):
 
     def __init__(self, centers, radii, alpha=1, color=(1,1,1)):
@@ -149,30 +181,13 @@ class Scene(object):
         wires = Wires(points, pairs, weights, alpha, cmap)
         self.add_actor(wires)
 
-    def add_tubes(self):
-        pass
+    def add_tubes(self, points, pairs, radii=None, weights=None, alpha=1, cmap=None):
+        tubes = Tubes(points, pairs, weights, alpha, cmap)
+        self.add_actor(tubes)
 
     def add_spheres(self, points, radii, alpha=1, color=(1,1,1)):
         spheres = Spheres(points, radii, alpha, color)
         self.add_actor(spheres)
-
-
-if __name__ == '__main__':
-    network = mini.Delaunay.random(100)
-    x,y,z = network.coords
-    dbcs = 2*(x==x.min()) + 1*(x==x.max())
-    sol = mini.linear_solve(network, dbcs)
-
-    wires = Wires(network.points, network.pairs, sol)
-    shells = Spheres(network.points, [0.08*1.05 for _ in network.points], alpha=0.3, color=(1,1,1))
-    spheres = Spheres(network.points, [[r for _ in network.points] for r in np.linspace(0.01,0.08,50)], color=(0,0,1))
-
-    scene = Scene()
-    scene.add_actor(wires)
-    scene.add_actor(shells)
-    scene.add_actor(spheres)
-    scene.play(10)
-
 
 #~~
 def save_gif(self, size=(400,300), frames=1):
