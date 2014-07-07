@@ -184,21 +184,29 @@ class Network(dict):
 
         return new
 
-    def cut(self, mask, values=None):
+    def cut(self, mask, values=None, bijective=False):
         '''
         returns id of throats where the the tail is masked and the head is not.
         (ie: True for sources).
 
         for convenience, if a value array is given, the corresponding values
         are returned instead of indices 
+
+        the bijective condition, if enabled, drops any edges that are not
+        one-to-one
         '''
         imask = self.indexes[np.array(mask).nonzero()]
         heads, tails = self.pairs.T
         pair_mask = np.in1d(heads, imask) & ~np.in1d(tails, imask)
+
         if values is None:
             return pair_mask.nonzero()[0] # 1 dimension only
         else:
-            return values[self.pairs[pair_mask]]
+            tails, heads = values[self.pairs[pair_mask]].T
+            if not bijective:
+                return tails, heads
+            valid = (np.bincount(tails)[tails]==1) & (np.bincount(heads)[heads]==1)
+            return tails[valid], heads[valid]
 
     def prune(self, inaccessible, remove_pores=True):
         new = self.copy()

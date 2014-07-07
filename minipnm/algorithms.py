@@ -2,31 +2,33 @@ from collections import Counter
 import numpy as np
 from scipy import linalg, sparse
 from scipy.sparse.linalg import spsolve
+import warnings
 
 def solve_bvp(laplacian, dirichlet, neumann={}):
     '''
     boundary conditions given as dictionaries of { value : mask }
     the length of the Dirichlet masks should be of network.order,
-    while Neumann masks are the indices of specified edge gradients
+    while Neumann masks are the indices of the tail and head of any specified
+    edge gradient.
 
     example:
     >>> dirichlet = { 1 : x == x.min() }
     >>> neumann = { 5 : network.cut(x == x.max(), network.indexes).T }
     '''
     n_conditions_imposed = sum(dirichlet.values())
-    for source_like,sink_like in neumann.values():
+    for source_like, sink_like in neumann.values():\
         # this basically replaces each value by its count
         # ie. [a a b a c b] = [3 3 2 3 1 2]
-        ids, counts = [np.array(l) for l in zip(*Counter(source_like).items())]
-        n_conditions_imposed[ids] += counts
+        count = np.bincount(source_like)[source_like]
+        n_conditions_imposed[source_like] += count
     if any(n_conditions_imposed > 1):
         raise Exception("Overlapping BCs")
 
     _, membership = sparse.csgraph.connected_components(laplacian)
     isolated = set(membership[n_conditions_imposed==0]) - set(membership[n_conditions_imposed>0])
-    print isolated
-    dirichlet[0] = dirichlet.get(0, np.zeros_like(membership)) | np.in1d(membership, list(isolated))
-    n_conditions_imposed[list(isolated)] += 1
+    targets = np.in1d(membership, list(isolated))
+    dirichlet[0] = dirichlet.get(0, np.zeros_like(membership)) | targets
+    n_conditions_imposed[targets] += 1
 
     free = n_conditions_imposed == 0
     D = sparse.eye(laplacian.shape[0]).tocsr()
@@ -36,7 +38,9 @@ def solve_bvp(laplacian, dirichlet, neumann={}):
         elements_of_A.append( D[mask.nonzero()] )
         elements_of_b.append( value * np.ones(mask.sum()) )
 
-    for v,(t,h) in neumann.items():
+    for v, (t, h) in neumann.items():
+        if not any(t):
+            raise Exception("BC value <{}> has no domain.".format(v))
         elements_of_A.append( (D[t] - D[h]).todense() )
         elements_of_b.append( np.true_divide(v, t.size) * np.ones_like(t) )
 
