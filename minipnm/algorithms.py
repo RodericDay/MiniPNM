@@ -163,6 +163,10 @@ def shortest_path(cmat, start=None, end=None, heuristic=lambda i: 0, return_all=
     vertex_costs[start] = 0
 
     while not all(i in exhausted for i in end):
+        # exit condition
+        if not any(reached):
+            raise Exception("Options exhausted, path not found")
+
         # source vertex index, where source is the lowest cost vertex available
         estimate = lambda i: vertex_costs[i] + heuristic(i)
         si = lowest_cost_index = min(reached, key=estimate)
