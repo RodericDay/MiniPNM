@@ -147,7 +147,14 @@ def volumetric(network, sources, capacities, sinks=None, f=1, resolution=100):
 
     return volumes
 
-def shortest_path(cmat, start=None, end=None, heuristic=lambda i: 0, return_all=False):
+class PathNotFound(Exception):
+    msg = "{} options exhausted, path not found"
+    def __init__(self, exhausted):
+        self.exhausted = list(exhausted)
+    def __str__(self):
+        return self.msg.format(len(self.exhausted))
+
+def shortest_path(cmat, start=None, end=None, heuristic=None):
     '''
     finds the shortest path in a graph, given edge costs. can start at any
     point in [start] and end at any point in [end]
@@ -156,6 +163,8 @@ def shortest_path(cmat, start=None, end=None, heuristic=lambda i: 0, return_all=
         start = (0,)
     if end is None:
         end = (cmat.col.max(),)
+    if heuristic is None:
+        heuristic = lambda i: 0
 
     reached = set(start)
     exhausted = set()
@@ -165,7 +174,9 @@ def shortest_path(cmat, start=None, end=None, heuristic=lambda i: 0, return_all=
     while not all(i in exhausted for i in end):
         # exit condition
         if not any(reached):
-            raise Exception("Options exhausted, path not found")
+            if any(i in end for i in exhausted):
+                break
+            raise PathNotFound(exhausted)
 
         # source vertex index, where source is the lowest cost vertex available
         estimate = lambda i: vertex_costs[i] + heuristic(i)
@@ -194,7 +205,4 @@ def shortest_path(cmat, start=None, end=None, heuristic=lambda i: 0, return_all=
         path.append(best_parent)
     path.reverse()
 
-    if not return_all:
-        return path
-
-    return {'main':path, 'reached':list(reached), 'exhausted':list(exhausted-set(path))}
+    return path
