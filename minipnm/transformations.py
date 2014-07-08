@@ -1,3 +1,5 @@
+import numpy as np
+
 def convexify(self, f=10):
     ''' this method gives networks a slight convexity to allow
         the ConvexHull algorithm to detect the faces. The translation is
@@ -23,6 +25,21 @@ def convexify(self, f=10):
 
     self['coords'] = np.vstack([x,y,z]).T
 
-def pad():
+def add_natural_boundaries(network):
     '''
+    takes every boundary pore and obtains the distance to its neighbours, and
+    then creates a virtual pore diametrically opposite
     '''
+    pl = network.points
+    tl, hl = network.pairs.T
+    new_points, new_pairs = [], []
+    i = network.order
+    for t in network.boundary().nonzero()[0]:
+        for h in hl[t==tl]:
+            a,b = pl[[t,h]]
+            new_points.append(a - (b-a))
+            new_pairs.append((t,i))
+            i+=1
+
+    network.points = np.vstack([network.points, new_points])
+    network.pairs = np.vstack([network.pairs, new_pairs])
