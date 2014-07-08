@@ -4,17 +4,7 @@ from scipy import linalg, sparse
 from scipy.sparse.linalg import spsolve
 import warnings
 
-def solve_bvp(laplacian, dirichlet, neumann={}):
-    '''
-    boundary conditions given as dictionaries of { value : mask }
-    the length of the Dirichlet masks should be of network.order,
-    while Neumann masks are the indices of the tail and head of any specified
-    edge gradient.
-
-    example:
-    >>> dirichlet = { 1 : x == x.min() }
-    >>> neumann = { 5 : network.cut(x == x.max(), network.indexes).T }
-    '''
+def count_conditions(laplacian, dirichlet, neumann):
     n_conditions_imposed = sum(dirichlet.values())
     for source_like, sink_like in neumann.values():\
         # this basically replaces each value by its count
@@ -29,6 +19,21 @@ def solve_bvp(laplacian, dirichlet, neumann={}):
     targets = np.in1d(membership, list(isolated))
     dirichlet[0] = dirichlet.get(0, np.zeros_like(membership)) | targets
     n_conditions_imposed[targets] += 1
+
+    return n_conditions_imposed
+
+def solve_bvp(laplacian, dirichlet, neumann={}):
+    '''
+    boundary conditions given as dictionaries of { value : mask }
+    the length of the Dirichlet masks should be of network.order,
+    while Neumann masks are the indices of the tail and head of any specified
+    edge gradient.
+
+    example:
+    >>> dirichlet = { 1 : x == x.min() }
+    >>> neumann = { 5 : network.cut(x == x.max(), network.indexes).T }
+    '''
+    n_conditions_imposed = count_conditions(laplacian, dirichlet, neumann)
 
     free = n_conditions_imposed == 0
     D = sparse.eye(laplacian.shape[0]).tocsr()
