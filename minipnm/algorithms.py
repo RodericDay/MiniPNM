@@ -17,7 +17,8 @@ def count_conditions(laplacian, dirichlet, neumann):
     _, membership = sparse.csgraph.connected_components(laplacian)
     isolated = set(membership[n_conditions_imposed==0]) - set(membership[n_conditions_imposed>0])
     targets = np.in1d(membership, list(isolated))
-    dirichlet[0] = dirichlet.get(0, np.zeros_like(membership)) | targets
+    if any(targets):
+        dirichlet[0] = dirichlet.get(0, np.zeros_like(membership)) | targets
     n_conditions_imposed[targets] += 1
 
     return n_conditions_imposed
@@ -40,13 +41,15 @@ def solve_bvp(laplacian, dirichlet, neumann={}):
     elements_of_A, elements_of_b = [laplacian[free]], [np.zeros(free.sum())]
 
     for value, mask in dirichlet.items():
+        if not any(mask):
+            raise Exception("BC value <{}> has no domain.".format(value))
         elements_of_A.append( D[mask.nonzero()] )
         elements_of_b.append( value * np.ones(mask.sum()) )
 
     for v, (t, h) in neumann.items():
         if not any(t):
             raise Exception("BC value <{}> has no domain.".format(v))
-        elements_of_A.append( (D[t] - D[h]).todense() )
+        elements_of_A.append( (D[t] - D[h]) )
         elements_of_b.append( np.true_divide(v, t.size) * np.ones_like(t) )
 
     A = sparse.vstack(elements_of_A).tocsr()
