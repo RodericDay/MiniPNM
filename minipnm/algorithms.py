@@ -6,21 +6,22 @@ import warnings
 
 def count_conditions(laplacian, dirichlet, neumann):
     n_conditions_imposed = sum(dirichlet.values())
-    for source_like, sink_like in neumann.values():\
-        # this basically replaces each value by its count
-        # ie. [a a b a c b] = [3 3 2 3 1 2]
-        count = np.bincount(source_like)[source_like]
-        n_conditions_imposed[source_like] += count
-    if any(n_conditions_imposed > 1):
-        raise Exception("Overlapping BCs")
 
-    _, membership = sparse.csgraph.connected_components(laplacian)
-    isolated = set(membership[n_conditions_imposed==0]) - set(membership[n_conditions_imposed>0])
-    targets = np.in1d(membership, list(isolated))
+    _, label = sparse.csgraph.connected_components(laplacian)
+    isolated = set(label[n_conditions_imposed==0]) - set(label[n_conditions_imposed>0])
+    targets = np.in1d(label, list(isolated))
     if any(targets):
-        dirichlet[0] = dirichlet.get(0, np.zeros_like(membership)) | targets
+        dirichlet[0] = dirichlet.get(0, np.zeros_like(label)) | targets
     n_conditions_imposed[targets] += 1
 
+    target_idxs = targets.nonzero()[0]
+    for v, (tail_ids, head_ids) in neumann.items():
+        zeroed_out = np.in1d(tail_ids, target_idxs)
+        neumann[v] = (tail_ids[~zeroed_out], head_ids[~zeroed_out])
+        n_conditions_imposed[neumann[v][0]] += 1
+
+    if any(n_conditions_imposed > 1):
+        raise Exception("Overlapping BCs")
     return n_conditions_imposed
 
 def solve_bvp(laplacian, dirichlet, neumann={}):
@@ -49,8 +50,9 @@ def solve_bvp(laplacian, dirichlet, neumann={}):
     for v, (t, h) in neumann.items():
         if not any(t):
             raise Exception("BC value <{}> has no domain.".format(v))
-        elements_of_A.append( (D[t] - D[h]) )
-        elements_of_b.append( np.true_divide(v, t.size) * np.ones_like(t) )
+        count = np.bincount(t)[np.unique(t)]
+        elements_of_A.append( laplacian[np.unique(t)] )
+        elements_of_b.append( np.true_divide(v, count.sum()) * count )
 
     A = sparse.vstack(elements_of_A).tocsr()
     b = np.hstack(elements_of_b)
