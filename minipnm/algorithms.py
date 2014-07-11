@@ -24,17 +24,8 @@ def count_conditions(laplacian, dirichlet, neumann):
         raise Exception("Overlapping BCs")
     return n_conditions_imposed
 
-def solve_bvp(laplacian, dirichlet, neumann={}):
-    '''
-    boundary conditions given as dictionaries of { value : mask }
-    the length of the Dirichlet masks should be of network.order,
-    while Neumann masks are the indices of the tail and head of any specified
-    edge gradient.
-
-    example:
-    >>> dirichlet = { 1 : x == x.min() }
-    >>> neumann = { 5 : network.cut(x == x.max(), network.indexes).T }
-    '''
+def build_bvp(laplacian, dirichlet, neumann=None):
+    if neumann is None: neumann = {}
     n_conditions_imposed = count_conditions(laplacian, dirichlet, neumann)
 
     free = n_conditions_imposed == 0
@@ -56,6 +47,20 @@ def solve_bvp(laplacian, dirichlet, neumann={}):
 
     A = sparse.vstack(elements_of_A).tocsr()
     b = np.hstack(elements_of_b)
+    return A, b
+
+def solve_bvp(laplacian, dirichlet, neumann=None):
+    '''
+    boundary conditions given as dictionaries of { value : mask }
+    the length of the Dirichlet masks should be of network.order,
+    while Neumann masks are the indices of the tail and head of any specified
+    edge gradient.
+
+    example:
+    >>> dirichlet = { 1 : x == x.min() }
+    >>> neumann = { 5 : network.cut(x == x.max(), network.indexes).T }
+    '''
+    A, b = build_bvp(laplacian, dirichlet, neumann)
     x = spsolve(A, b).round(5)
     return x
 
