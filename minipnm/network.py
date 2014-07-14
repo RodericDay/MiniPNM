@@ -307,7 +307,7 @@ class Cubic(Network):
         rel_coords = np.rint(rel_coords).astype(int) # absolutely bizarre bug
 
         actual_indexes = np.ravel_multi_index(rel_coords.T, self.resolution)
-        if values==None:
+        if values is None:
             values = self['source']
         _ndarray.flat[actual_indexes] = values.ravel()
         return _ndarray.squeeze()
