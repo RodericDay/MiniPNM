@@ -24,7 +24,7 @@ def count_conditions(laplacian, dirichlet, neumann):
         raise Exception("Overlapping BCs")
     return n_conditions_imposed
 
-def build_bvp(laplacian, dirichlet, neumann=None):
+def build_bvp(laplacian, dirichlet, neumann=None, diags=False):
     if neumann is None: neumann = {}
     n_conditions_imposed = count_conditions(laplacian, dirichlet, neumann)
 
@@ -47,6 +47,10 @@ def build_bvp(laplacian, dirichlet, neumann=None):
 
     A = sparse.vstack(elements_of_A).tocsr()
     b = np.hstack(elements_of_b)
+    if diags:
+        elements_of_D = D[free], sparse.csr_matrix((sum(~free), len(free)))
+        D = sparse.vstack(elements_of_D)
+        return A, b, D
     return A, b
 
 def solve_bvp(laplacian, dirichlet, neumann=None):
