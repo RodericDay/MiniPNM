@@ -277,7 +277,7 @@ class Cubic(Network):
         ndarray = np.atleast_3d(ndarray)
         dims = tuple(dims) + (1,) * (3 - len(dims))
 
-        self['source'] = ndarray.ravel()
+        self['source'] = np.array(ndarray.flat)
 
         points_rel = np.array(
             [idx for idx,val in np.ndenumerate(ndarray)]).astype(float)
