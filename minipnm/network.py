@@ -4,6 +4,7 @@ import os
 import itertools
 import random
 import traceback
+import warnings
 
 import numpy as np
 from scipy import spatial, sparse
@@ -208,31 +209,31 @@ class Network(dict):
             valid = (np.bincount(tails)[tails]==1) & (np.bincount(heads)[heads]==1)
             return tails[valid], heads[valid]
 
-    def prune(self, inaccessible, remove_pores=True):
-        new = self.copy()
-
+    def prune(self, inaccessible, remove_pores=False):
         accessible = self.indexes[~inaccessible.flatten()]
         good_heads = np.in1d(self['heads'], accessible)
         good_tails = np.in1d(self['tails'], accessible)
         if len(self.pairs) > 0:
-            new.pairs = self.pairs[good_heads & good_tails]
+            self.pairs = self.pairs[good_heads & good_tails]
         if not remove_pores:
-            return new
+            return self
 
         # remove the unwanted pores
-        if len(new.points) > 0:
-            new.points = self.points[accessible]
+        if len(self.points) > 0:
+            self.points = self.points[accessible]
         # now we need to shift throat indexes accordingly
-        if len(new.pairs) > 0:
-            hs, ts = new.pairs.T
-            mapping = np.zeros(self.order, dtype=int)
-            mapping[accessible] = new.indexes
-            new.pairs = np.vstack([mapping[hs], mapping[ts]]).T
+        if len(self.pairs) > 0:
+            hs, ts = self.pairs.T
+            mapping = np.zeros(inaccessible.size, dtype=int)
+            mapping[accessible] = self.indexes
+            self.pairs = np.vstack([mapping[hs], mapping[ts]]).T
         for key, array in self.items():
-            if array.size == self.order:
-                new[key] = array[accessible]
+            if array.size == inaccessible.size:
+                self[key] = array[accessible]
+            else:
+                warnings.warn("{} entry mismatch- not ported")
 
-        return new
+        return self
 
     def copy(self):
         clone = self.__class__.__new__(self.__class__)
@@ -263,7 +264,12 @@ class Network(dict):
         return self.merge(other)
 
     def __sub__(self, inaccessible):
-        return self.prune(inaccessible)
+        new = self.copy()
+        new.prune(inaccessible, remove_pores=True)
+        return new
+
+    def __isub__(self, inaccessible):
+        self.prune(inaccessible, remove_pores=True)
 
 
 class Cubic(Network):
