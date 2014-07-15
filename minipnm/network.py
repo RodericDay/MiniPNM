@@ -227,11 +227,11 @@ class Network(dict):
             mapping = np.zeros(inaccessible.size, dtype=int)
             mapping[accessible] = self.indexes
             self.pairs = np.vstack([mapping[hs], mapping[ts]]).T
-        for key, array in self.items():
+        for key, array in self.data():
             if array.size == inaccessible.size:
                 self[key] = array[accessible]
             else:
-                warnings.warn("{} entry mismatch- not ported")
+                warnings.warn("{} entry mismatch- not ported".format(key))
 
         return self
 
@@ -245,12 +245,20 @@ class Network(dict):
         subnetwork_2 = self - ~mask
         return subnetwork_1, subnetwork_2
 
+    def data(self):
+        '''
+        data is a mask on dict.items that returns non-essential stored arrays
+        '''
+        for key, value in self.items():
+            if key not in ('x','y','z','heads','tails'):
+                yield key, value
+
     def __repr__(self):
         return self.__class__.__name__+str(self.size)
 
     def __str__(self):
         entries = [self.__class__.__name__]
-        for key, value in sorted(self.items()):
+        for key, value in sorted(self.data()):
             entries.append('{:<15}: {:<10}: {:<15}'.format(
                     key,
                     value.dtype,
