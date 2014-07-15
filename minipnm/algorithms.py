@@ -4,10 +4,10 @@ from scipy import linalg, sparse
 from scipy.sparse.linalg import spsolve
 import warnings
 
-def count_conditions(laplacian, dirichlet, neumann):
+def count_conditions(system, dirichlet, neumann):
     n_conditions_imposed = sum(dirichlet.values())
 
-    _, label = sparse.csgraph.connected_components(laplacian)
+    _, label = sparse.csgraph.connected_components(system)
     isolated = set(label[n_conditions_imposed==0]) - set(label[n_conditions_imposed>0])
     targets = np.in1d(label, list(isolated))
     if any(targets):
@@ -24,13 +24,13 @@ def count_conditions(laplacian, dirichlet, neumann):
         raise Exception("Overlapping BCs")
     return n_conditions_imposed
 
-def build_bvp(laplacian, dirichlet, neumann=None, diags=False):
+def build_bvp(system, dirichlet, neumann=None, diags=False):
     if neumann is None: neumann = {}
-    n_conditions_imposed = count_conditions(laplacian, dirichlet, neumann)
+    n_conditions_imposed = count_conditions(system, dirichlet, neumann)
 
     free = n_conditions_imposed == 0
-    D = sparse.eye(laplacian.shape[0]).tocsr()
-    elements_of_A, elements_of_b = [laplacian[free]], [np.zeros(free.sum())]
+    D = sparse.eye(system.shape[0]).tocsr()
+    elements_of_A, elements_of_b = [system[free]], [np.zeros(free.sum())]
 
     for value, mask in dirichlet.items():
         if not any(mask):
@@ -42,7 +42,7 @@ def build_bvp(laplacian, dirichlet, neumann=None, diags=False):
         if not any(t):
             raise Exception("BC value <{}> has no domain.".format(v))
         count = np.bincount(t)[np.unique(t)]
-        elements_of_A.append( laplacian[np.unique(t)] )
+        elements_of_A.append( system[np.unique(t)] )
         elements_of_b.append( np.true_divide(v, count.sum()) * count )
 
     A = sparse.vstack(elements_of_A).tocsr()
@@ -53,7 +53,7 @@ def build_bvp(laplacian, dirichlet, neumann=None, diags=False):
         return A, b, D
     return A, b
 
-def solve_bvp(laplacian, dirichlet, neumann=None):
+def solve_bvp(system, dirichlet, neumann=None):
     '''
     boundary conditions given as dictionaries of { value : mask }
     the length of the Dirichlet masks should be of network.order,
@@ -64,7 +64,7 @@ def solve_bvp(laplacian, dirichlet, neumann=None):
     >>> dirichlet = { 1 : x == x.min() }
     >>> neumann = { 5 : network.cut(x == x.max(), network.indexes).T }
     '''
-    A, b = build_bvp(laplacian, dirichlet, neumann)
+    A, b = build_bvp(system, dirichlet, neumann)
     x = spsolve(A, b).round(5)
     return x
 
