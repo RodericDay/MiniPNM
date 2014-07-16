@@ -274,9 +274,6 @@ class Network(dict):
         new.prune(inaccessible, remove_pores=True)
         return new
 
-    def __isub__(self, inaccessible):
-        self.prune(inaccessible, remove_pores=True)
-
 
 class Cubic(Network):
 
