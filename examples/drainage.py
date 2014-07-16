@@ -21,7 +21,7 @@ sources = x<np.percentile(x, 5)
 sinks = x>np.percentile(x, 95)
 
 def flood(network, sources, radii, initial_state=None):
-    cmat = network.connectivity_matrix # some directed graphing
+    cmat = network.adjacency_matrix # some directed graphing
     area = np.pi*radii**2 # accessibility depends on HEAD only
     length = np.linalg.norm(network.points[cmat.row]-network.points[cmat.col])
     cmat.data = (area/length)[cmat.col]
@@ -48,7 +48,7 @@ def drain(network, sinks, cmat, initial_state=None):
     '''
     dumb method: remove largest so long as you don't generate islands
     '''
-    cmat = network.connectivity_matrix # some directed graphing
+    cmat = network.adjacency_matrix # some directed graphing
     area = np.pi*radii**2 # accessibility depends on TAIL only
     length = np.linalg.norm(network.points[cmat.row]-network.points[cmat.col])
     cmat.data = (area/length)[cmat.col]
@@ -86,7 +86,7 @@ history = np.vstack([
     drain_history,
     ])
 
-do = 2
+do = 1
 if do == 1:
     scene = mini.Scene()
     # scene.add_spheres(network.points, radii, alpha=0.1, color=(1,1,1))
