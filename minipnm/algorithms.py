@@ -24,19 +24,21 @@ def count_conditions(system, dirichlet, neumann):
         raise Exception("Overlapping BCs")
     return n_conditions_imposed
 
-def build_bvp(system, dirichlet, neumann=None, diags=False):
+def build_bvp(system, dirichlet, neumann=None, fast=False):
     if neumann is None: neumann = {}
     n_conditions_imposed = count_conditions(system, dirichlet, neumann)
 
     free = n_conditions_imposed == 0
     D = sparse.eye(system.shape[0]).tocsr()
     elements_of_A, elements_of_b = [system[free]], [np.zeros(free.sum())]
+    reindex = free.nonzero()
 
     for value, mask in dirichlet.items():
         if not any(mask):
             raise Exception("BC value <{}> has no domain.".format(value))
         elements_of_A.append( D[mask.nonzero()] )
         elements_of_b.append( value * np.ones(mask.sum()) )
+        reindex += mask.nonzero()
 
     for v, (t, h) in neumann.items():
         if not any(t):
@@ -44,13 +46,20 @@ def build_bvp(system, dirichlet, neumann=None, diags=False):
         count = np.bincount(t)[np.unique(t)]
         elements_of_A.append( system[np.unique(t)] )
         elements_of_b.append( np.true_divide(v, count.sum()) * count )
+        reindex += t.nonzero()
 
-    A = sparse.vstack(elements_of_A).tocsr()
+    reindex = np.hstack(reindex).astype('int32')
+
+    if fast:
+        A = sparse.vstack(elements_of_A)
+        b = np.hstack(elements_of_b)
+        return A, b
+
+    # reorders the system to preserve original structure
+    A = sparse.vstack(elements_of_A, format='csc')
+    A.indices = reindex[A.indices]
     b = np.hstack(elements_of_b)
-    if diags:
-        elements_of_D = D[free], sparse.csr_matrix((sum(~free), len(free)))
-        D = sparse.vstack(elements_of_D)
-        return A, b, D
+    b[reindex] = b.copy()
     return A, b
 
 def solve_bvp(system, dirichlet, neumann=None):
@@ -64,7 +73,7 @@ def solve_bvp(system, dirichlet, neumann=None):
     >>> dirichlet = { 1 : x == x.min() }
     >>> neumann = { 5 : network.cut(x == x.max(), network.indexes).T }
     '''
-    A, b = build_bvp(system, dirichlet, neumann)
+    A, b = build_bvp(system, dirichlet, neumann, fast=True)
     x = spsolve(A, b).round(5)
     return x
 
