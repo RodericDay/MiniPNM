@@ -214,7 +214,7 @@ class Network(dict):
         if len(self.pairs) > 0:
             self.pairs = self.pairs[good_heads & good_tails]
         if not remove_pores:
-            return self
+            return
 
         # remove the unwanted pores
         if len(self.points) > 0:
@@ -230,8 +230,6 @@ class Network(dict):
                 self[key] = array[accessible]
             else:
                 warnings.warn("{} entry mismatch- not ported".format(key))
-
-        return self
 
     def copy(self):
         clone = self.__class__.__new__(self.__class__)
@@ -280,7 +278,7 @@ class Cubic(Network):
     @classmethod
     def empty(cls, dims, shape=None):
         arr = np.zeros(dims)
-        return cls(arr, shape or arr.shape)
+        return cls(arr, shape if shape is not None else arr.shape)
 
     def __init__(self, ndarray, dims=[1,1,1]):
         ndarray = np.atleast_3d(ndarray)
