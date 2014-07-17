@@ -5,6 +5,8 @@ points = np.random.rand(1000,3)
 points.T[2] *= 0
 network = mini.Delaunay(points)
 network = network - network.boundary()
+radii = mini.distances_to_nearest_neighbors(network)/2
+
 x,y,z = network.coords
 candidates = (0.4 < x) & (x < 0.6)
 
@@ -13,16 +15,15 @@ sources[np.random.choice(candidates.nonzero()[0], 5)] = 1
 
 sinks = (x < np.percentile(x,1)) #| (x > np.percentile(x,95))
 
-radii = mini.distances_to_nearest_neighbors(network)/2
-
 history = mini.invasion(network, sources, 1/radii, sinks=sinks)
 history = np.vstack([history, np.atleast_2d(history[-1]).repeat(5, axis=0)])
 
 sol = np.zeros_like(history, dtype=float)
 for i, state in enumerate(history):
-    copy = network.prune(state & ~sources, remove_pores=False)
-    dbcs = 3*(x < np.percentile(x,5)) + 1*sources
-    sol[i] = mini.linear_solve(copy, dbcs)
+    copy = network.copy()
+    copy.prune(state & ~sources)
+    dbcs = { 3 : (x < np.percentile(x,5)), 1 : sources }
+    sol[i] = mini.solve_bvp(copy.laplacian, dbcs)
 
 scene = mini.Scene()
 scene.add_spheres((network-~sources).points, radii[sources]*1.1)

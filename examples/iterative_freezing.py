@@ -35,7 +35,7 @@ for i in range(5):
     # freeze the smallest 20% of the filled pores
     filled = saturation[-1]
     frozen.append( filled & (thresholds < np.percentile(thresholds[filled], 20)) | frozen[-1])
-    clone = clone.prune(frozen[-1], remove_pores=False)
+    clone.prune(frozen[-1], remove_pores=False)
 
 frozen = np.vstack([[f]*len(s) for s,f in zip(sat_history, frozen)])[::10]
 sat_history = np.vstack(sat_history)[::10]
