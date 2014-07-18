@@ -1,9 +1,34 @@
+import io
 from itertools import count
 import numpy as np
+from scipy import misc
 from PyQt4 import QtGui, QtCore
 import pyqtgraph as QtGraph
 import vtk
 from vtk.qt4.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor
+
+
+class Canvas(QtGui.QWidget):
+
+    def __init__(self):
+        super(Canvas, self).__init__()
+        self.vbox = QtGui.QVBoxLayout(self)
+        self.toolBar = QtGui.QToolBar(self)
+        self.vbox.addWidget(self.toolBar)
+        self.toolBar.addAction("2NumPy", self.toArray)
+        self.scene = QtGui.QGraphicsScene()
+        self.view = QtGui.QGraphicsView(self.scene, self)
+        self.vbox.addWidget(self.view)
+
+    def toArray(self):
+        pixmap = QtGui.QPixmap.grabWidget(self.view)
+        byteArray = QtCore.QByteArray()
+        _buffer = QtCore.QBuffer(byteArray)
+        _buffer.open(QtCore.QIODevice.WriteOnly)
+        pixmap.save(_buffer, 'PNG')
+        _file = io.BytesIO(byteArray.data())
+        array = misc.imread(_file)
+        return array
 
 
 class MainWindow(QtGui.QMainWindow):
