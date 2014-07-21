@@ -2,7 +2,6 @@ from itertools import count
 import numpy as np
 from matplotlib import cm
 import vtk
-import minipnm as mini
 
 
 class Actor(vtk.vtkActor):
@@ -42,7 +41,7 @@ class Actor(vtk.vtkActor):
             colors.InsertNextTuple3(r,g,b)
         return colors
 
-    def update(self, t):
+    def update(self, t=0):
         pass
 
 
@@ -73,37 +72,31 @@ class Wires(Actor):
         self.polydata.GetPointData().SetScalars(self.colorArray(self.weights[i], self.cmap))
 
 
-class Tubes(Wires):
+class Tubes(Actor):
 
-    def __init__(self, vertex_coords, edge_pairs, vertex_weights=None, alpha=1, cmap=None):
+    def __init__(self, vertex_coords, edge_pairs, radii, alpha=1, cmap=None):
+        # duplicate points s.t. tubes do not share nodes
+        points = vertex_coords[np.hstack(edge_pairs)]
+        pairs = np.arange(edge_pairs.size).reshape(edge_pairs.shape)
+        radii = radii[edge_pairs].min(axis=1).repeat(2)/2
+
         self.polydata = vtk.vtkPolyData()
-        self.polydata.SetPoints(self.pointArray(vertex_coords))
-        self.polydata.SetLines(self.lineArray(edge_pairs))
+        self.polydata.SetPoints(self.pointArray(points))
+        self.polydata.SetLines(self.lineArray(pairs))
+        self.polydata.GetPointData().SetScalars(self.floatArray(radii))
 
         self.tubeFilter = vtk.vtkTubeFilter()
         self.tubeFilter.SetInput(self.polydata)
-        self.tubeFilter.SetRadius(0.1)
-        self.tubeFilter.SetNumberOfSides(5)
+        self.tubeFilter.SetVaryRadiusToVaryRadiusByAbsoluteScalar()
+        self.tubeFilter.SetNumberOfSides(10)
 
         self.mapper = vtk.vtkPolyDataMapper()
         self.mapper.SetInputConnection(self.tubeFilter.GetOutputPort())
+        self.mapper.ScalarVisibilityOff()
         self.SetMapper(self.mapper)
-
-        if vertex_weights is None:
-            weights = np.atleast_2d([128 for _ in vertex_coords])
-        else:
-            weights = np.atleast_2d(vertex_weights)
-            weights = np.subtract(weights, weights.min())
-            weights = np.true_divide(weights, weights.max())
-        self.weights = weights
-        self.cmap = cmap
-        self.update()
 
         self.GetProperty().SetOpacity(alpha)
 
-    def update(self, t=0):
-        i = t % len(self.weights)
-        self.polydata.GetPointData().SetScalars(self.colorArray(self.weights[i], self.cmap))
 
 class Spheres(Actor):
 
@@ -182,7 +175,7 @@ class Scene(object):
         self.add_actor(wires)
 
     def add_tubes(self, points, pairs, radii=None, weights=None, alpha=1, cmap=None):
-        tubes = Tubes(points, pairs, weights, alpha, cmap)
+        tubes = Tubes(points, pairs, radii, alpha, cmap)
         self.add_actor(tubes)
 
     def add_spheres(self, points, radii, alpha=1, color=(1,1,1)):
