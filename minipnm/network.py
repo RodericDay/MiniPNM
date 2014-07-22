@@ -72,8 +72,18 @@ class Network(dict):
         del self['tails']
 
     @property
+    def midpoints(self):
+        tails, heads = self.points[self.pairs.T]
+        return tails + (heads - tails)/2
+
+    @property
+    def spans(self):
+        tails, heads = self.points[self.pairs.T]
+        return heads - tails
+
+    @property
     def lengths(self):
-        return np.linalg.norm(np.diff(self.points[self.pairs], axis=1), axis=2).astype('float16')
+        return np.linalg.norm(self.spans, axis=1).astype('float16')
 
     @property
     def adjacency_matrix(self):
@@ -382,7 +392,7 @@ class Bridson(Network):
     n_iter = 100
     p_max = 10000
 
-    def __init__(self, pdf, dims):
+    def __init__(self, dims=[10,10,10], pdf=(1 for _ in itertools.count())):
 
         self._points = [(0,0,0)]
         self._radii = [next(pdf)]
@@ -394,7 +404,7 @@ class Bridson(Network):
 
         self.points = self._points
         del self._points
-        self['radii'] = np.array(self._radii)
+        self['radii'] = np.array(self._radii, dtype=float)
         del self._radii
         del self._available
         del self._dims
