@@ -74,24 +74,20 @@ class Wires(Actor):
 
 class Tubes(Actor):
 
-    def __init__(self, vertex_coords, edge_pairs, radii, alpha=1, cmap=None):
-        # duplicate points s.t. tubes do not share nodes
-        points = vertex_coords[np.hstack(edge_pairs)]
-        pairs = np.arange(edge_pairs.size).reshape(edge_pairs.shape)
-        t_radii = radii[edge_pairs].min(axis=1).repeat(2)/2.
+    def __init__(self, centers, vectors, radii, alpha=1, cmap=None):
+        tails = centers - vectors/2.
+        heads = centers + vectors/2.
+        points = np.vstack(zip(tails, heads))
+        pairs = np.arange(len(centers)*2).reshape(-1, 2)
+        radii = radii.repeat(2)
 
-        # shaving
-        s_radii = radii[np.hstack(edge_pairs)]
-        shave = s_radii * np.cos(np.arcsin(np.true_divide(t_radii,s_radii)))
-        dvs = points[1::2] - points[::2]
-        uvs = (dvs.T / np.linalg.norm(dvs, axis=1)).T
-        stacked = np.vstack(zip(uvs, -uvs))
-        points = points + (shave * stacked.T).T
+        assert (points.size/3. == pairs.size)
+        assert (pairs.size == radii.size)
 
         self.polydata = vtk.vtkPolyData()
         self.polydata.SetPoints(self.pointArray(points))
         self.polydata.SetLines(self.lineArray(pairs))
-        self.polydata.GetPointData().SetScalars(self.floatArray(t_radii))
+        self.polydata.GetPointData().SetScalars(self.floatArray(radii))
 
         self.tubeFilter = vtk.vtkTubeFilter()
         self.tubeFilter.SetInput(self.polydata)
@@ -183,8 +179,8 @@ class Scene(object):
         wires = Wires(points, pairs, weights, alpha, cmap)
         self.add_actor(wires)
 
-    def add_tubes(self, points, pairs, radii=None, weights=None, alpha=1, cmap=None):
-        tubes = Tubes(points, pairs, radii, alpha, cmap)
+    def add_tubes(self, centers, vectors, radii, alpha=1, cmap=None):
+        tubes = Tubes(centers, vectors, radii, alpha, cmap)
         self.add_actor(tubes)
 
     def add_spheres(self, points, radii, alpha=1, color=(1,1,1)):
