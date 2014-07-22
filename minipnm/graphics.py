@@ -78,17 +78,26 @@ class Tubes(Actor):
         # duplicate points s.t. tubes do not share nodes
         points = vertex_coords[np.hstack(edge_pairs)]
         pairs = np.arange(edge_pairs.size).reshape(edge_pairs.shape)
-        radii = radii[edge_pairs].min(axis=1).repeat(2)/2
+        t_radii = radii[edge_pairs].min(axis=1).repeat(2)/2.
+
+        # shaving
+        s_radii = radii[np.hstack(edge_pairs)]
+        shave = s_radii * np.cos(np.arcsin(np.true_divide(t_radii,s_radii)))
+        dvs = points[1::2] - points[::2]
+        uvs = (dvs.T / np.linalg.norm(dvs, axis=1)).T
+        stacked = np.vstack(zip(uvs, -uvs))
+        points = points + (shave * stacked.T).T
 
         self.polydata = vtk.vtkPolyData()
         self.polydata.SetPoints(self.pointArray(points))
         self.polydata.SetLines(self.lineArray(pairs))
-        self.polydata.GetPointData().SetScalars(self.floatArray(radii))
+        self.polydata.GetPointData().SetScalars(self.floatArray(t_radii))
 
         self.tubeFilter = vtk.vtkTubeFilter()
         self.tubeFilter.SetInput(self.polydata)
         self.tubeFilter.SetVaryRadiusToVaryRadiusByAbsoluteScalar()
         self.tubeFilter.SetNumberOfSides(10)
+        self.tubeFilter.CappingOn()
 
         self.mapper = vtk.vtkPolyDataMapper()
         self.mapper.SetInputConnection(self.tubeFilter.GetOutputPort())
