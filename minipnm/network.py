@@ -388,8 +388,9 @@ class PackedSpheres(Network):
 
 class Bridson(Network):
     '''
-    Poisson sampling algorithm, to generate networks that respect a
-    given distribution
+    Poisson disc sampling to generate points,
+    Delaunay to generate throats,
+    Some basic transformations to ensure geometric coherence,
     '''
     n_iter = 100
     p_max = 10000

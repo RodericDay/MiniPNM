@@ -1,5 +1,4 @@
 import numpy as np
-np.set_printoptions(linewidth=160, precision=2)
 import minipnm as mini
 
 
@@ -59,22 +58,3 @@ def intersecting(center, radius,
     rad2rad = radius + radii
     clear = (cap_condition & (distance > radius-0.01)) | (distance > rad2rad)
     return ~clear
-
-if __name__ == '__main__':
-    network = mini.Bridson([7,7,7], (i%5/5.+0.1 for i,_ in enumerate(iter(int,1))))
-    network.pairs = mini.Delaunay.edges_from_points(network.points, directed=False)
-    network['radii_cylinder'] = network['radii'][network.pairs].min(axis=1)/4.
-    spans, midpoints = cylinders(network.points, network['radii'], network.pairs)
-
-    for center, radius in zip(network.points, network['radii']):
-        safe = ~intersecting(center, radius, spans, midpoints, network['radii_cylinder'])
-        
-        # deletes and stuff
-        midpoints = midpoints[safe]
-        spans = spans[safe]
-        network['radii_cylinder'] = network['radii_cylinder'][safe]
-
-    scene = mini.Scene()
-    scene.add_spheres(network.points, network['radii'], color=(0,0,1), alpha=0.4)
-    scene.add_tubes(midpoints, spans, network['radii_cylinder'])
-    scene.play()

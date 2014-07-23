@@ -151,7 +151,7 @@ def test_lengths():
 
 def test_bridson():
     pdf = (np.random.normal(3) if i%3!=2 else np.random.normal(8) for i in it.count())
-    network = mini.Bridson(pdf, [30,30,10])
+    network = mini.Bridson([30,30,10], pdf)
 
 def test_shortest_path():
     string = '''

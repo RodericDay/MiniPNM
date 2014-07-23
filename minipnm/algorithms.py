@@ -4,6 +4,10 @@ from scipy import linalg, sparse
 from scipy.sparse.linalg import spsolve
 import warnings
 
+
+
+
+
 def count_conditions(system, dirichlet, neumann):
     n_conditions_imposed = sum(dirichlet.values())
 
@@ -76,6 +80,10 @@ def solve_bvp(system, dirichlet, neumann=None):
     A, b = build_bvp(system, dirichlet, neumann, fast=True)
     x = spsolve(A, b).round(5)
     return x
+
+
+
+
 
 def percolation(network, sources, thresholds, condition_range,
                 base=0.5, rate=1.3):
@@ -175,6 +183,10 @@ def volumetric(network, sources, capacities, sinks=None, f=1, resolution=100):
 
     return volumes
 
+
+
+
+
 class PathNotFound(Exception):
     msg = "{} options exhausted, path not found"
     def __init__(self, exhausted):
@@ -234,3 +246,8 @@ def shortest_path(cmat, start=None, end=None, heuristic=None):
     path.reverse()
 
     return path
+
+
+
+
+

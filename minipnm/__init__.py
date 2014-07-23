@@ -12,3 +12,4 @@ from .algorithms import *
 from .misc import *
 from .utils import *
 from .binary import *
+from . import geometry
