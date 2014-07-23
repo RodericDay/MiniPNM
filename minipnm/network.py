@@ -9,6 +9,8 @@ import warnings
 import numpy as np
 from scipy import spatial, sparse
 
+from .algorithms import poisson_disk_sampling
+from .geometry import cylinders, intersecting
 from .graphics import Scene
 
 ''' Subclassing rules
@@ -388,82 +390,50 @@ class PackedSpheres(Network):
 
 class Bridson(Network):
     '''
+    A tightly packed network of spheres and cylinders following a given
+    distribution
+
     Poisson disc sampling to generate points,
     Delaunay to generate throats,
     Some basic transformations to ensure geometric coherence,
     '''
-    n_iter = 100
-    p_max = 10000
+    def __init__(self, bbox=[10,10,10], pdf=(1 for _ in itertools.count())):
+        points, radii = poisson_disk_sampling(bbox, pdf)
+        self.points, self['pore_radii'] = np.array(points), np.array(radii)
+        self.pairs = Delaunay.edges_from_points(self.points)
+        self['cylinder_radii'] = self['pore_radii'][self.pairs].min(axis=1)/4.
+        self.spans, self.midpoints = cylinders(self.points, self['pore_radii'], self.pairs)
 
-    def __init__(self, dims=[10,10,10], pdf=(1 for _ in itertools.count())):
-        self._points = [(0,0,0)]
-        self._radii = [next(pdf)]
-        self._available = [0]
-        self._dims = dims
+        for center, radius in zip(self.points, self['pore_radii']):
+            safe = ~intersecting(center, radius,
+                                 self.spans, self.midpoints, self['cylinder_radii'])
+            
+            # deletes and stuff
+            self.pairs = self.pairs[safe]
+            self.midpoints = self.midpoints[safe]
+            self.spans = self.spans[safe]
+            self['cylinder_radii'] = self['cylinder_radii'][safe]
 
-        while self._available and len(self._points) <= self.p_max:
-            self.add_point(next(pdf))
+    @property
+    def spans(self):
+        return np.vstack([self['cylinder_length_x'], self['cylinder_length_y'], self['cylinder_length_z']]).T
 
-        self.points = self._points
-        del self._points
-        self['radii'] = np.array(self._radii, dtype=float)
-        del self._radii
-        del self._available
-        del self._dims
+    @spans.setter
+    def spans(self, _points):
+        _points = np.nan_to_num(np.array(_points))
+        self['cylinder_length_x'], self['cylinder_length_y'], self['cylinder_length_z'] = _points.T
 
-    def add_point(self, r):
-        idx = random.choice(self._available)
+    @property
+    def midpoints(self):
+        return np.vstack([self['cylinder_center_x'], self['cylinder_center_y'], self['cylinder_center_z']]).T
 
-        xi, yi, zi = self._points[idx]
-        min_dist = self._radii[idx] + r
-        inner_r = min_dist
-        outer_r = min_dist*2
-
-        for j in range(self.n_iter):
-            aj = random.random() * 2 * np.pi * (1 if len(self._dims) == 3 else 0)
-            bj = random.random() * np.pi
-            rj = ( random.random()*(outer_r**3 - inner_r**3) + inner_r**3 )**(1./3.)
-
-            xj = rj * np.cos(aj) * np.sin(bj) + xi
-            yj = rj * np.cos(aj) * np.cos(bj) + yi
-            zj = rj * np.sin(aj) + zi
-
-            # check if the point center is within bounds
-            def outside():
-                return any(abs(c) > d/2. for c,d in zip([xj,yj,zj], self._dims))
-
-            # make sure that the distance between any two centers is larger
-            # than sum of corresponding radii
-            def near():
-                for (xk, yk, zk), rk in zip(self._points, self._radii):
-                    radii_sum = r + rk
-                    dist_mhtn = [abs(xj-xk), abs(yj-yk), abs(zj-zk)]
-                    if any(dm > radii_sum for dm in dist_mhtn):
-                        yield False
-                    else:
-                        dist_btwn = np.linalg.norm(dist_mhtn)
-                        yield radii_sum > dist_btwn
-
-            # if it isn't, bail!
-            if outside() or any(near()):
-                continue
-
-            # if we got here the point is valid!
-            self._available.append( len(self._points) )
-            self._points.append( (xj, yj, zj) )
-            self._radii.append( r )
-            return
-
-        # if we got here, it's because no new points were able to be generated
-        # the point is probably too crowded to have new neighbors, so we should
-        # stop considering it
-        self._available.remove(idx)
-        if not any(self._available):
-            return
-        self.add_point(r)
+    @midpoints.setter
+    def midpoints(self, _points):
+        _points = np.nan_to_num(np.array(_points))
+        self['cylinder_center_x'], self['cylinder_center_y'], self['cylinder_center_z'] = _points.T
 
     def render(self):
         scene = Scene()
-        scene.add_spheres(self.points, self['radii'], color=(0,0,1))
-        scene.add_tubes(self.points, self.pairs)
+        scene.add_spheres(self.points, self['pore_radii'], color=(0,0,1), alpha=0.4)
+        scene.add_tubes(self.midpoints, self.spans, self['cylinder_radii'])
         scene.play()
