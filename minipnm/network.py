@@ -419,7 +419,7 @@ class Bridson(Network):
         outer_r = min_dist*2
 
         for j in range(self.n_iter):
-            aj = random.random() * 2 * np.pi
+            aj = random.random() * 2 * np.pi * (1 if len(self._dims) == 3 else 0)
             bj = random.random() * np.pi
             rj = ( random.random()*(outer_r**3 - inner_r**3) + inner_r**3 )**(1./3.)
 
