@@ -106,15 +106,15 @@ def debug():
     import minipnm as mini
 
     pdf = (np.random.weibull(3) for _ in count())
-    network = mini.Bridson(pdf, [50,50,2])
-    network.pairs = mini.Delaunay.edges_from_points(network.points)
+    network = mini.Bridson([20,20,2], pdf)
+    print network
 
     x,y,z = network.coords
     source = x==x.min()
-    history = mini.invasion(network, source, 1./network['radii'])
+    history = mini.invasion(network, source, 1./network['sphere_radii'])
 
+    spheres = mini.Spheres(network.points, network['sphere_radii'] * history, color=(0,0,1))
     wires = mini.Wires(network.points, network.pairs)
-    spheres = mini.Spheres(network.points, network['radii'] * history, color=(0,0,1))
 
     app = QtGui.QApplication(sys.argv)
     window = MainWindow()
@@ -122,7 +122,7 @@ def debug():
     window.addActor(spheres)
 
     x = np.arange(len(history))
-    y = (network['radii'] * history).sum(axis=1)
+    y = (network['sphere_radii'] * history).sum(axis=1)
     window.plotXY(x,y)
     
     sys.exit(app.exec_())

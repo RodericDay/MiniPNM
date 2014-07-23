@@ -399,12 +399,12 @@ class Bridson(Network):
     '''
     def __init__(self, bbox=[10,10,10], pdf=(1 for _ in itertools.count())):
         points, radii = poisson_disk_sampling(bbox, pdf)
-        self.points, self['pore_radii'] = np.array(points), np.array(radii)
+        self.points, self['sphere_radii'] = np.array(points), np.array(radii)
         self.pairs = Delaunay.edges_from_points(self.points)
-        self['cylinder_radii'] = self['pore_radii'][self.pairs].min(axis=1)/4.
-        self.spans, self.midpoints = cylinders(self.points, self['pore_radii'], self.pairs)
+        self['cylinder_radii'] = self['sphere_radii'][self.pairs].min(axis=1)/4.
+        self.spans, self.midpoints = cylinders(self.points, self['sphere_radii'], self.pairs)
 
-        for center, radius in zip(self.points, self['pore_radii']):
+        for center, radius in zip(self.points, self['sphere_radii']):
             safe = ~intersecting(center, radius,
                                  self.spans, self.midpoints, self['cylinder_radii'])
             
@@ -434,6 +434,6 @@ class Bridson(Network):
 
     def render(self):
         scene = Scene()
-        scene.add_spheres(self.points, self['pore_radii'], color=(0,0,1), alpha=0.4)
+        scene.add_spheres(self.points, self['sphere_radii'], color=(0,0,1), alpha=0.4)
         scene.add_tubes(self.midpoints, self.spans, self['cylinder_radii'])
         scene.play()
