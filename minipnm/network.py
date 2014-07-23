@@ -9,6 +9,7 @@ import warnings
 import numpy as np
 from scipy import spatial, sparse
 
+from .misc import laplacian
 from .algorithms import poisson_disk_sampling
 from .geometry import cylinders, intersecting
 from .graphics import Scene
@@ -95,12 +96,7 @@ class Network(dict):
 
     @property
     def laplacian(self):
-        '''
-        this is the graph theory version of the Laplacian matrix
-        '''
-        A = self.adjacency_matrix
-        D = sparse.diags(A.sum(axis=1).A1, 0)
-        return D - A
+        return laplacian(self.adjacency_matrix)
     
     @property
     def labels(self):

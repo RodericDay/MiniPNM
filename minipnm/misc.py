@@ -1,7 +1,7 @@
 from __future__ import absolute_import, division
 import bisect
 import numpy as np
-from scipy import misc, ndimage
+from scipy import misc, ndimage, sparse
 
 '''
 misc houses scientific tools and helpers
@@ -15,6 +15,14 @@ def normalize(array):
     array = np.subtract(array, array.min())
     array = np.true_divide(array, array.max())
     return array
+
+def laplacian(A):
+    '''
+    this is the graph theory version of the Laplacian matrix, given
+    a value-weighted adjacency matrix A
+    '''
+    D = sparse.diags(A.sum(axis=1).A1, 0)
+    return D - A
 
 def gaussian_noise(dims, exp=0.5):
     R = np.random.random(dims)
