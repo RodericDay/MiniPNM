@@ -2,31 +2,41 @@ import numpy as np
 np.set_printoptions(linewidth=160, precision=2)
 import minipnm as mini
 
-network = mini.Bridson([7,7,7], (i%5/5.+0.1 for i,_ in enumerate(iter(int,1))))
-network.pairs = mini.Delaunay.edges_from_points(network.points, directed=False)
-# network = mini.Delaunay.random(20)
-# network['radii'] = np.random.rand(network.order)/5
 
-# find dimensions of connecting cylinders
-# given points, spherical radii, and pairings
-network['radii_sphere'] = network['radii']
-network['radii_cylinder'] = network['radii_sphere'][network.pairs].min(axis=1)/2
-# unit vector
-uvs = (network.spans.T / np.linalg.norm(network.spans, axis=1)).T
-# span needs to be shrunk
-radsum = network['radii_sphere'][network.pairs].sum(axis=1)
-spans = network.spans - (radsum.T * uvs.T).T
-# midpoint needs to be shifted
-radsub = np.diff(network['radii_sphere'][network.pairs], axis=1)
-midpoints = network.midpoints - (radsub.T * uvs.T).T/2.
-
-
-# now we should do some cleanup
-# spheres intersecting tubes
-start_count = len(midpoints)
-for center, radius in zip(network.points, network['radii_sphere']):
+def cylinders(centers, radii, pairs=None):
     '''
-    Distance from point to (infinite) line:
+    generates geometrically correct cylinders to act as sphere connectors.
+    quantities can either be given as pairs, or as an array with pair indices
+    supplied separately.
+
+    if the cylinder radii is supplied, the calculations will be adjusted for
+    best fit. default is point connection at sphere surface (minimalistic)
+
+    output:
+        spans, midpoints
+    '''
+    if pairs is not None:
+        centers = centers[pairs]
+        radii = radii[pairs]
+
+    spans = np.diff(centers, axis=1).squeeze()
+    midpoints = centers[ :, 0, :] + spans/2.
+    unit = (spans.T / np.linalg.norm(spans, axis=1)).T
+    # shave endpoints
+    radsum = radii.sum(axis=1)
+    spans -= (radsum.T * unit.T).T
+    # shift midpoint
+    radsub = np.diff(radii, axis=1)
+    midpoints -= (radsub.T * unit.T).T / 2.
+    return spans, midpoints
+
+def intersecting(center, radius,
+                 spans, midpoints, radii):
+    '''
+    takes in a sphere and multiple cylinders
+    returns a mask indicating which cylinders intersected the sphere
+    
+    Distance from point to (infinite) line(s):
     d = (a - p) - ((a - p) dot n) n
 
        a
@@ -37,27 +47,34 @@ for center, radius in zip(network.points, network['radii_sphere']):
             \|
              * p
     '''
+    unit = (spans.T / np.linalg.norm(spans, axis=1)).T
     # a minus p
     amp = midpoints - center
-    shift = ((amp * uvs).sum(axis=1) * uvs.T).T
+    shift = ((amp * unit).sum(axis=1) * unit.T).T
     closest_point = midpoints - shift.clip(-abs(spans/2), abs(spans/2))
     # different elimination condition depending on cap vs. radial collision
     closest_point_if_inf = midpoints - shift
     cap_condition = np.any(closest_point!=closest_point_if_inf, axis=1)
     distance = np.linalg.norm(center - closest_point, axis=1)
-    rad2rad = radius + network['radii_cylinder']
+    rad2rad = radius + radii
+    clear = (cap_condition & (distance > radius-0.01)) | (distance > rad2rad)
+    return ~clear
 
-    safe = (cap_condition & (distance > radius-0.01)) | (distance > rad2rad)
+if __name__ == '__main__':
+    network = mini.Bridson([7,7,7], (i%5/5.+0.1 for i,_ in enumerate(iter(int,1))))
+    network.pairs = mini.Delaunay.edges_from_points(network.points, directed=False)
+    network['radii_cylinder'] = network['radii'][network.pairs].min(axis=1)/4.
+    spans, midpoints = cylinders(network.points, network['radii'], network.pairs)
 
-    # deletes and stuff
-    uvs = uvs[safe]
-    midpoints = midpoints[safe]
-    spans = spans[safe]
-    network['radii_cylinder'] = network['radii_cylinder'][safe]
-print start_count - len(midpoints)
+    for center, radius in zip(network.points, network['radii']):
+        safe = ~intersecting(center, radius, spans, midpoints, network['radii_cylinder'])
+        
+        # deletes and stuff
+        midpoints = midpoints[safe]
+        spans = spans[safe]
+        network['radii_cylinder'] = network['radii_cylinder'][safe]
 
-# currently displaying bad tubes
-scene = mini.Scene()
-scene.add_spheres(network.points, network['radii_sphere'], color=(0,0,1), alpha=0.4)
-scene.add_tubes(midpoints, spans, network['radii_cylinder'])
-scene.play()
+    scene = mini.Scene()
+    scene.add_spheres(network.points, network['radii'], color=(0,0,1), alpha=0.4)
+    scene.add_tubes(midpoints, spans, network['radii_cylinder'])
+    scene.play()
