@@ -342,7 +342,7 @@ class Delaunay(Network):
         self.points = np.atleast_2d(points)
 
     @staticmethod
-    def edges_from_points(points, mask=None):
+    def edges_from_points(points, mask=None, directed=True):
         triangulation = spatial.Delaunay(Delaunay.drop_coplanar(points))
         edges = set()
         for unindexed in triangulation.vertices:
@@ -355,8 +355,10 @@ class Delaunay(Network):
                     edges.add(edge)
 
         one_way = np.array(list(edges))
-        other_way = np.fliplr(one_way)
-        return np.vstack([one_way, other_way])
+        if directed:
+            other_way = np.fliplr(one_way)
+            return np.vstack([one_way, other_way])
+        return one_way
 
     @staticmethod
     def drop_coplanar(points):
@@ -393,7 +395,6 @@ class Bridson(Network):
     p_max = 10000
 
     def __init__(self, dims=[10,10,10], pdf=(1 for _ in itertools.count())):
-
         self._points = [(0,0,0)]
         self._radii = [next(pdf)]
         self._available = [0]
