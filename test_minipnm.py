@@ -63,7 +63,7 @@ def test_linear_solver():
     l = x == x.min()
     r = x == x.max()
     dbcs = { 2 : l, 1 : r }
-    sol = mini.solve_bvp(network.laplacian, dbcs)
+    sol = mini.algorithms.bvp.solve(network.laplacian, dbcs)
 
     l_flux = np.subtract(*network.cut(l, sol)).sum()
     r_flux = -np.subtract(*network.cut(r, sol)).sum()

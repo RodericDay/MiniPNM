@@ -1,22 +1,21 @@
-def count_conditions(system, dirichlet, neumann):
-    n_conditions_imposed = sum(dirichlet.values())
+import numpy as np
+from scipy import sparse
+from scipy.sparse.linalg import spsolve
 
-    _, label = sparse.csgraph.connected_components(system)
-    isolated = set(label[n_conditions_imposed==0]) - set(label[n_conditions_imposed>0])
-    targets = np.in1d(label, list(isolated))
-    if any(targets):
-        dirichlet[0] = dirichlet.get(0, np.zeros_like(label)) | targets
-    n_conditions_imposed[targets] += 1
+def solve(system, dirichlet, neumann=None):
+    '''
+    boundary conditions given as dictionaries of { value : mask }
+    the length of the Dirichlet masks should be of network.order,
+    while Neumann masks are the indices of the tail and head of any specified
+    edge gradient.
 
-    target_idxs = targets.nonzero()[0]
-    for v, (tail_ids, head_ids) in neumann.items():
-        zeroed_out = np.in1d(tail_ids, target_idxs)
-        neumann[v] = (tail_ids[~zeroed_out], head_ids[~zeroed_out])
-        n_conditions_imposed[neumann[v][0]] += 1
-
-    if any(n_conditions_imposed > 1):
-        raise Exception("Overlapping BCs")
-    return n_conditions_imposed
+    example:
+    >>> dirichlet = { 1 : x == x.min() }
+    >>> neumann = { 5 : network.cut(x == x.max(), network.indexes).T }
+    '''
+    A, b = build(system, dirichlet, neumann, fast=True)
+    x = spsolve(A, b).round(5)
+    return x
 
 def build(system, dirichlet, neumann=None, fast=False):
     if neumann is None: neumann = {}
@@ -56,17 +55,22 @@ def build(system, dirichlet, neumann=None, fast=False):
     b[reindex] = b.copy()
     return A, b
 
-def solve(system, dirichlet, neumann=None):
-    '''
-    boundary conditions given as dictionaries of { value : mask }
-    the length of the Dirichlet masks should be of network.order,
-    while Neumann masks are the indices of the tail and head of any specified
-    edge gradient.
+def count_conditions(system, dirichlet, neumann):
+    n_conditions_imposed = sum(dirichlet.values())
 
-    example:
-    >>> dirichlet = { 1 : x == x.min() }
-    >>> neumann = { 5 : network.cut(x == x.max(), network.indexes).T }
-    '''
-    A, b = build_bvp(system, dirichlet, neumann, fast=True)
-    x = spsolve(A, b).round(5)
-    return x
+    _, label = sparse.csgraph.connected_components(system)
+    isolated = set(label[n_conditions_imposed==0]) - set(label[n_conditions_imposed>0])
+    targets = np.in1d(label, list(isolated))
+    if any(targets):
+        dirichlet[0] = dirichlet.get(0, np.zeros_like(label)) | targets
+    n_conditions_imposed[targets] += 1
+
+    target_idxs = targets.nonzero()[0]
+    for v, (tail_ids, head_ids) in neumann.items():
+        zeroed_out = np.in1d(tail_ids, target_idxs)
+        neumann[v] = (tail_ids[~zeroed_out], head_ids[~zeroed_out])
+        n_conditions_imposed[neumann[v][0]] += 1
+
+    if any(n_conditions_imposed > 1):
+        raise Exception("Overlapping BCs")
+    return n_conditions_imposed
