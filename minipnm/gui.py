@@ -1,4 +1,4 @@
-import io
+import io, bisect
 
 import numpy as np
 from scipy import misc
@@ -98,14 +98,16 @@ class GUI(QtGui.QMainWindow):
 
     def plotXY(self, x, y):
         self.plotWidget.clear()
-        self.plotWidget.plot(x,y)
+        self.plotWidget.plot(x,y, symbol='o')
         self.timeLine = QtGraph.InfiniteLine(angle=90, movable=True)
         self.timeLine.setBounds((min(x), max(x)))
         self.timeLine.sigPositionChanged.connect(self.updateRenderWindow)
         self.plotWidget.addItem(self.timeLine)
 
     def updateRenderWindow(self):
-        self.scene.update_all(t=self.timeLine.value())
+        x = self.plotWidget.plotItem.listDataItems()[0].xData
+        t = bisect.bisect_left(x, self.timeLine.value())
+        self.scene.update_all(t=t)
 
     def run(self):
         self.show()
