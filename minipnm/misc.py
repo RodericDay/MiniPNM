@@ -24,32 +24,6 @@ def laplacian(A):
     D = sparse.diags(A.sum(axis=1).A1, 0)
     return D - A
 
-def gaussian_noise(dims, exp=0.5):
-    R = np.random.random(dims)
-    N = np.zeros_like(R)
-    for i in 2**np.arange(6):
-        N += ndimage.filters.gaussian_filter(R, i) * i**exp
-    N = normalize(N)
-    return N
-
-def extract_spheres(im):
-    '''
-    credit to untubu @ stackoverflow for this
-    still needs a lot of improvement
-    '''
-    im = np.atleast_3d(im)
-    data = ndimage.morphology.distance_transform_edt(im)
-    max_data = ndimage.filters.maximum_filter(data, 10)
-    maxima = data==max_data # but this includes some globally low voids
-    min_data = ndimage.filters.minimum_filter(data, 10)
-    diff = (max_data - min_data) > 1
-    maxima[diff==0] = 0
-
-    labels, num_maxima = ndimage.label(maxima)
-    centers = [ndimage.center_of_mass(labels==i) for i in range(1, num_maxima+1)]
-    radii = [data[center] for center in centers]
-    return np.array(centers), np.array(radii)
-
 def distances_to_neighbors(network):
     output = [[] for i in range(network.order)]
     for (t,h), d in zip(network.pairs, network.lengths):

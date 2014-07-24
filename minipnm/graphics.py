@@ -186,24 +186,3 @@ class Scene(object):
     def add_spheres(self, points, radii, alpha=1, color=(1,1,1)):
         spheres = Spheres(points, radii, alpha, color)
         self.add_actor(spheres)
-
-#~~
-def save_gif(self, size=(400,300), frames=1):
-    self.renWin.SetSize(*size)
-    w2if = vtk.vtkWindowToImageFilter()
-    w2if.SetInput(self.renWin)
-     
-    writer = vtk.vtkPNGWriter()
-    try:
-        os.system("mkdir tmp")
-
-        for i in range(frames):
-            self.timeout()
-            w2if.Modified()
-            writer.SetFileName("tmp/{:0>3}.png".format(i))
-            writer.SetInput(w2if.GetOutput())
-            writer.Write()
-
-        os.system("convert -delay 20 -loop 0 ./tmp/*.png ~/animated.gif")
-    finally:
-        os.system("rm -r tmp")

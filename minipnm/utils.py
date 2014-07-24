@@ -6,17 +6,6 @@ from scipy import misc, ndimage
 '''
 utils houses software developer tools and helpers
 '''
-def imread(path_or_ndarray, zoom=0.1):
-    try:
-        im = misc.imread(path_or_ndarray)
-    except AttributeError:
-        im = path_or_ndarray
-    # check if the image is just a stack of sames
-    if not np.any(im - np.dstack([im[:,:,0]]*im.shape[-1])):
-        im = im[:,:,0]
-    im = ndimage.zoom(im, zoom, order=1)
-    im = im.transpose()
-    return im.squeeze()
 
 class FormulaDict(dict):
     '''
@@ -45,25 +34,4 @@ class FormulaDict(dict):
         return '\n'.join("{key:<10} : {value}".format(**locals()) \
                          for key, value in sorted(self.items()))
 
-def ubcread(path):
-    string = gzip.open(path).read()
-    im = np.fromstring(string, dtype='int8').reshape(512,512,512)
-    im = im[:-1,:-1,:-1]
-    return im
 
-def view_stack(path):
-    '''
-    Simple shortcut to explore the .ubc files provided by Sheppard
-    '''
-    from matplotlib.widgets import Slider
-    plt.rcParams['image.cmap'] = 'binary'
-    string = gzip.open(path).read()
-    im = np.fromstring(string, dtype='int8').reshape(512,512,512)
-
-    fig, ax = plt.subplots(1)
-    ax.imshow(im[0])
-    fig.subplots_adjust(bottom=0.2)
-    sax = fig.add_axes([0.2, 0.1, 0.6, 0.05])
-    slider = Slider(sax, 'Z', 0, len(im), 0, closedmax=False)
-    conn = slider.on_changed(lambda value: ax.imshow(im[int(value)]))
-    plt.show()
