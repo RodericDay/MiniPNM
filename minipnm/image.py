@@ -1,22 +1,25 @@
 import numpy as np
-from scipy import ndimage
+from scipy import misc, ndimage
+from tempfile import NamedTemporaryFile
+from subprocess import call
 
 '''
 Functions related to generation and handling of 2D images, and stacks thereof
 '''
+
 def imread(path_or_ndarray, zoom=0.1):
     try:
         im = misc.imread(path_or_ndarray)
     except AttributeError:
         im = path_or_ndarray
-    # check if the image is just a stack of sames
+    # collapse redundant rgba channels (ie: is grayscale)
     if not np.any(im - np.dstack([im[:,:,0]]*im.shape[-1])):
         im = im[:,:,0]
     im = ndimage.zoom(im, zoom, order=1)
     im = im.transpose()
     return im.squeeze()
 
-def ubcread(path):
+def read_ubc(path):
     string = gzip.open(path).read()
     im = np.fromstring(string, dtype='int8').reshape(512,512,512)
     im = im[:-1,:-1,:-1]
@@ -57,31 +60,34 @@ def extract_spheres(im):
     radii = [data[center] for center in centers]
     return np.array(centers), np.array(radii)
 
-def gaussian_noise(dims, exp=0.5):
-    R = np.random.random(dims)
+def gaussian_noise(shape, exp=0.5, mode='wrap'):
+    '''
+    mode : reflect, constant, nearest, mirror, wrap
+    '''
+    R = np.random.random(shape)
     N = np.zeros_like(R)
     for i in 2**np.arange(6):
-        N += ndimage.filters.gaussian_filter(R, i) * i**exp
+        N += ndimage.filters.gaussian_filter(R, i, mode=mode) * i**exp
     N = np.true_divide(N, np.abs(N).max())
     N = np.subtract(N, N.min())
     return N
 
-def save_gif(self, size=(400,300), frames=1):
+def vtk_stack():
     self.renWin.SetSize(*size)
     w2if = vtk.vtkWindowToImageFilter()
     w2if.SetInput(self.renWin)
-     
     writer = vtk.vtkPNGWriter()
-    try:
-        os.system("mkdir tmp")
+    for i in range(frames):
+        self.timeout()
+        w2if.Modified()
+        writer.SetFileName("tmp/{:0>3}.png".format(i))
+        writer.SetInput(w2if.GetOutput())
+        writer.Write()
 
-        for i in range(frames):
-            self.timeout()
-            w2if.Modified()
-            writer.SetFileName("tmp/{:0>3}.png".format(i))
-            writer.SetInput(w2if.GetOutput())
-            writer.Write()
-
-        os.system("convert -delay 20 -loop 0 ./tmp/*.png ~/animated.gif")
-    finally:
-        os.system("rm -r tmp")
+def save_gif(image_stack, outfile='animated.gif'):
+    slide_paths = []
+    for slide in image_stack.T:
+        f = NamedTemporaryFile(suffix='.png', delete=False)
+        misc.imsave(f, slide)
+        slide_paths.append( f.name )
+    call(["convert"] + slide_paths + [outfile])
