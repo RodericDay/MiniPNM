@@ -1,7 +1,9 @@
-import numpy as np
-from scipy import misc, ndimage
 from tempfile import NamedTemporaryFile
 from subprocess import call
+import gzip
+
+import numpy as np
+from scipy import misc, ndimage
 
 '''
 Functions related to generation and handling of 2D images, and stacks thereof
@@ -42,7 +44,13 @@ def view_stack(image_stack):
     conn = slider.on_changed(lambda value: im_obj.set_data(slides[int(value)]))
     plt.show()
 
-def imread(path_or_ndarray, zoom=0.1):
+def read_ubc(path):
+    string = gzip.open(path).read()
+    im = np.fromstring(string, dtype='int8').reshape(512,512,512)
+    im = im[:-1,:-1,:-1]
+    return im
+
+def read(path_or_ndarray, zoom=0.1):
     try:
         im = misc.imread(path_or_ndarray)
     except AttributeError:
@@ -53,13 +61,6 @@ def imread(path_or_ndarray, zoom=0.1):
     im = ndimage.zoom(im, zoom, order=1)
     im = im.transpose()
     return im.squeeze()
-
-def read_ubc(path):
-    string = gzip.open(path).read()
-    im = np.fromstring(string, dtype='int8').reshape(512,512,512)
-    im = im[:-1,:-1,:-1]
-    return im
-
 
 def extract_spheres(im):
     '''

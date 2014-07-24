@@ -30,6 +30,18 @@ class Canvas(QtGui.QWidget):
         array = misc.imread(_file)
         return array
 
+# homeless vtk2arr function
+def vtk_stack():
+    self.renWin.SetSize(*size)
+    w2if = vtk.vtkWindowToImageFilter()
+    w2if.SetInput(self.renWin)
+    writer = vtk.vtkPNGWriter()
+    for i in range(frames):
+        self.timeout()
+        w2if.Modified()
+        writer.SetFileName("tmp/{:0>3}.png".format(i))
+        writer.SetInput(w2if.GetOutput())
+        writer.Write()
 
 class MainWindow(QtGui.QMainWindow):
 

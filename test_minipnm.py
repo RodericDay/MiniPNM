@@ -56,7 +56,7 @@ def test_rectilinear_integrity_2d():
     assert np.allclose(M, O)
 
 def test_linear_solver():
-    R = mini.gaussian_noise([10, 10, 10])
+    R = mini.image.gaussian_noise([10, 10, 10])
     network = mini.Cubic(R)
     network = network - (R<np.percentile(R, 10))
     x,y,z = network.coords
@@ -119,7 +119,7 @@ def test_sphere_stuff():
     network = mini.Cubic(im, im.shape)
     network = network - im
 
-    centers, radii = mini.extract_spheres(im)
+    centers, radii = mini.image.extract_spheres(im)
     sphere = mini.PackedSpheres(centers, radii)
 
     stitched = mini.binary.radial_join(network, sphere)
