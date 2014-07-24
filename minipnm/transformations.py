@@ -1,5 +1,15 @@
 import numpy as np
 
+'''
+transformation houses processes that are deeply intertwined with 'Network'
+class functionality, and cannot be simply broken down into modularized array
+operations.
+
+warning:
+    these functions will not return data, emphasizing that they are
+    mutating the objects that are sent as arguments. be careful!
+'''
+
 def convexify(self, f=10):
     ''' this method gives networks a slight convexity to allow
         the ConvexHull algorithm to detect the faces. The translation is

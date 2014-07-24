@@ -6,6 +6,7 @@ from scipy import misc, ndimage, sparse
 '''
 misc houses scientific tools and helpers
 '''
+
 def mid(array):
     center = (array.max() - array.min())/2.
     return array[bisect.bisect_left(array, center)]
