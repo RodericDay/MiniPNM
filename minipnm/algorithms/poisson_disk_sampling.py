@@ -42,13 +42,13 @@ def poisson_disk_sampling(bbox, pdf, n_iter=100, p_max=10000):
 
         for j in range(n_iter):
             # try a random point in the sampling space
-            aj = random.random() * 2 * math.pi if is3d else 0
-            bj = random.random() * 2 * math.pi
+            aj = random.random() * 2 * math.pi
+            bj = random.random() * 2 * math.pi if is3d else 0
             rj = ( random.random()*(outer_r**3 - inner_r**3) + inner_r**3 )**(1./3.)
 
-            xj = rj * math.cos(aj) * math.sin(bj) + xi
-            yj = rj * math.cos(aj) * math.cos(bj) + yi
-            zj = rj * math.sin(aj) + zi
+            xj = rj * math.cos(bj) * math.sin(aj) + xi
+            yj = rj * math.cos(bj) * math.cos(aj) + yi
+            zj = rj * math.sin(bj) + zi
 
             # bail of checks fail
             if outside() or any(near()):
