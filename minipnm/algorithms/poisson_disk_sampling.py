@@ -1,3 +1,5 @@
+import random, math
+
 def poisson_disk_sampling(bbox, pdf, n_iter=100, p_max=10000):
     '''
     A 3D version of Robert Bridson's algorithm, perhaps best illustrated by
@@ -22,7 +24,7 @@ def poisson_disk_sampling(bbox, pdf, n_iter=100, p_max=10000):
             if any(dm > radii_sum for dm in dist_mhtn):
                 yield False
             else:
-                dist_btwn = np.linalg.norm(dist_mhtn)
+                dist_btwn = math.sqrt(sum(d**2 for d in dist_mhtn))
                 yield radii_sum > dist_btwn
 
     points = [(0,0,0)]
@@ -40,13 +42,13 @@ def poisson_disk_sampling(bbox, pdf, n_iter=100, p_max=10000):
 
         for j in range(n_iter):
             # try a random point in the sampling space
-            aj = random.random() * 2 * np.pi if is3d else 0
-            bj = random.random() * 2 * np.pi
+            aj = random.random() * 2 * math.pi if is3d else 0
+            bj = random.random() * 2 * math.pi
             rj = ( random.random()*(outer_r**3 - inner_r**3) + inner_r**3 )**(1./3.)
 
-            xj = rj * np.cos(aj) * np.sin(bj) + xi
-            yj = rj * np.cos(aj) * np.cos(bj) + yi
-            zj = rj * np.sin(aj) + zi
+            xj = rj * math.cos(aj) * math.sin(bj) + xi
+            yj = rj * math.cos(aj) * math.cos(bj) + yi
+            zj = rj * math.sin(aj) + zi
 
             # bail of checks fail
             if outside() or any(near()):
