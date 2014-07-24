@@ -80,24 +80,6 @@ def test_subtract_all():
     assert rereduced.size == 0
     assert all(value.size==0 for value in rereduced.values())
 
-def test_percolation():
-    network = mini.Cubic.empty([5,1,1])
-    x,y,z = network.coords
-    sources = np.array([1,0,0,0,0], dtype=bool)
-    thresholds = np.array([1,2,3,4,1])
-    conditions = [1,2,3,4]
-
-    output = mini.percolation(network, sources, thresholds, conditions, rate=1)
-
-    target = np.array([
-        [1/2,   0,   0,   0,   0],
-        [3/4, 1/2,   0,   0,   0],
-        [5/6, 2/3, 1/2,   0,   0],
-        [7/8, 3/4, 5/8, 1/2, 7/8],
-    ])
-    
-    assert np.allclose(output, target)
-
 def test_render():
     try:
         import vtk
