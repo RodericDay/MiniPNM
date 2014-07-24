@@ -140,30 +140,30 @@ class Spheres(Actor):
 class Scene(object):
     ticks = count(0)
 
-    def __init__(self, renWin=None, fix_camera=True):
+    def __init__(self, parent=None, fix_camera=True):
         '''
         fix_camera : more sensible default
         '''
-        if renWin is None:
-            # create
-            self.ren = vtk.vtkRenderer()
+        if parent is not None:
+            self.renWin = parent.GetRenderWindow()
+            self.iren = self.renWin.GetInteractor()
+        else:
             self.renWin = vtk.vtkRenderWindow()
             self.iren = vtk.vtkRenderWindowInteractor()
-
-            # hookups
-            self.renWin.AddRenderer(self.ren)
             self.iren.SetRenderWindow(self.renWin)
-            
-            if fix_camera:
-                camera = vtk.vtkInteractorStyleTrackballCamera()
-                self.iren.SetInteractorStyle(camera)
 
-        # account for renWin being provided by Qt GUI backend
+        self.ren = vtk.vtkRenderer()
+        self.renWin.AddRenderer(self.ren)
+        
+        if fix_camera:
+            camera = vtk.vtkInteractorStyleTrackballCamera()
+            self.iren.SetInteractorStyle(camera)
 
-    def update_all(self, object=None, event=None):
+    def update_all(self, object=None, event=None, t=None):
+        if t is None:   t = next(self.ticks)
         for aid in range(self.ren.VisibleActorCount()):
             actor = self.ren.GetActors().GetItemAsObject(aid)
-            actor.update(next(self.ticks))
+            actor.update(t)
         self.renWin.Render()
 
     def play(self, timeout=1):

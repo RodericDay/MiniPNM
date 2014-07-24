@@ -1,12 +1,15 @@
 import io
-from itertools import count
+
 import numpy as np
 from scipy import misc
+
 from PyQt4 import QtGui, QtCore
 import pyqtgraph as QtGraph
+
 import vtk
 from vtk.qt4.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor
 
+from .graphics import Scene
 
 class Canvas(QtGui.QWidget):
 
@@ -43,9 +46,10 @@ def vtk_stack():
         writer.SetInput(w2if.GetOutput())
         writer.Write()
 
-class MainWindow(QtGui.QMainWindow):
+class GUI(QtGui.QMainWindow):
 
     def __init__(self, parent=None):
+        self.app = QtGui.QApplication([])
         QtGui.QMainWindow.__init__(self, parent)
 
         self.initToolBar()
@@ -60,20 +64,15 @@ class MainWindow(QtGui.QMainWindow):
 
     def initVtk(self):
         self.frame = QtGui.QFrame()
+        self.vtkWidget = QVTKRenderWindowInteractor(parent=self.frame)
 
         self.vl = QtGui.QVBoxLayout()
-        self.vtkWidget = QVTKRenderWindowInteractor(self.frame)
         self.vl.addWidget(self.vtkWidget)
 
-        self.ren = vtk.vtkRenderer()
-        self.vtkWidget.GetRenderWindow().AddRenderer(self.ren)
-        self.iren = self.vtkWidget.GetRenderWindow().GetInteractor()
+        self.scene = Scene(self.vtkWidget)
 
         self.frame.setLayout(self.vl)
         self.setCentralWidget(self.frame)
-
-        self.show()
-        self.iren.Initialize()
 
     def initPlot(self):
         self.plotWidget = QtGraph.PlotWidget(self)
@@ -94,8 +93,8 @@ class MainWindow(QtGui.QMainWindow):
         self.toolBar.addAction(self.treeDockWidget.toggleViewAction())
 
     def addActor(self, actor):
-        self.ren.AddActor(actor)
-        self.ren.ResetCamera()
+        self.scene.ren.AddActor(actor)
+        self.scene.ren.ResetCamera()
 
     def plotXY(self, x, y):
         self.plotWidget.clear()
@@ -106,39 +105,9 @@ class MainWindow(QtGui.QMainWindow):
         self.plotWidget.addItem(self.timeLine)
 
     def updateRenderWindow(self):
-        t = self.timeLine.value()
-        for idx in range(self.ren.VisibleActorCount()):
-            actor = self.ren.GetActors().GetItemAsObject(idx)
-            actor.update(t)
-        self.iren.Render()
+        self.scene.update_all(t=self.timeLine.value())
 
-
-def debug():
-    import sys
-    import minipnm as mini
-
-    pdf = (np.random.weibull(3) for _ in count())
-    network = mini.Bridson([20,20,5], pdf)
-    print network
-
-    x,y,z = network.coords
-    source = x==x.min()
-    history = mini.algorithms.invasion(network, source, 1./network['sphere_radii'])
-
-    spheres = mini.Spheres(network.points, network['sphere_radii'] * history, color=(0,0,1))
-    wires = mini.Wires(network.points, network.pairs)
-
-    app = QtGui.QApplication(sys.argv)
-    window = MainWindow()
-    window.addActor(wires)
-    window.addActor(spheres)
-
-    x = np.arange(len(history))
-    y = (network['sphere_radii'] * history).sum(axis=1)
-    window.plotXY(x,y)
-    
-    sys.exit(app.exec_())
-
-
-if __name__ == "__main__":
-    debug()
+    def run(self):
+        self.show()
+        self.scene.iren.Initialize()
+        self.app.exec_()

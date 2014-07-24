@@ -14,3 +14,4 @@ from .binary import *
 from . import algorithms
 from . import geometry
 from . import image
+from .gui import GUI
