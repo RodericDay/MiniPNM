@@ -7,6 +7,41 @@ from subprocess import call
 Functions related to generation and handling of 2D images, and stacks thereof
 '''
 
+def gaussian_noise(shape, exp=1, mode='wrap'):
+    '''
+    mode : reflect, constant, nearest, mirror, wrap
+    '''
+    R = np.random.random(shape)
+    N = np.zeros_like(R)
+    for sigma in 2**np.arange(6):
+        N += ndimage.filters.gaussian_filter(R, sigma, mode=mode) * sigma**exp
+    N = np.true_divide(N, np.abs(N).max())
+    N = np.subtract(N, N.min())
+    return N
+
+def save_gif(image_stack, outfile='animated.gif'):
+    slide_paths = []
+    for slide in image_stack.T:
+        f = NamedTemporaryFile(suffix='.png', delete=False)
+        misc.imsave(f, slide)
+        slide_paths.append( f.name )
+    call(["convert"] + slide_paths + [outfile])
+
+def view_stack(image_stack):
+    '''
+    quick matplotlib image stack explorer
+    '''
+    import matplotlib.pyplot as plt
+    from matplotlib.widgets import Slider
+    slides = [slide for slide in image_stack.T]
+    fig = plt.figure()
+    im_axes = fig.add_axes([0.1,0.2,0.8,0.7])
+    im_obj = im_axes.imshow(slides[0], interpolation='nearest', cmap='binary')
+    slider_axes = fig.add_axes([0.2, 0.1, 0.6, 0.05])
+    slider = Slider(slider_axes, 'Z', 0, len(slides), 0, closedmax=False)
+    conn = slider.on_changed(lambda value: im_obj.set_data(slides[int(value)]))
+    plt.show()
+
 def imread(path_or_ndarray, zoom=0.1):
     try:
         im = misc.imread(path_or_ndarray)
@@ -25,22 +60,6 @@ def read_ubc(path):
     im = im[:-1,:-1,:-1]
     return im
 
-def view_stack(path):
-    '''
-    Simple shortcut to explore the .ubc files provided by Sheppard
-    '''
-    from matplotlib.widgets import Slider
-    plt.rcParams['image.cmap'] = 'binary'
-    string = gzip.open(path).read()
-    im = np.fromstring(string, dtype='int8').reshape(512,512,512)
-
-    fig, ax = plt.subplots(1)
-    ax.imshow(im[0])
-    fig.subplots_adjust(bottom=0.2)
-    sax = fig.add_axes([0.2, 0.1, 0.6, 0.05])
-    slider = Slider(sax, 'Z', 0, len(im), 0, closedmax=False)
-    conn = slider.on_changed(lambda value: ax.imshow(im[int(value)]))
-    plt.show()
 
 def extract_spheres(im):
     '''
@@ -59,35 +78,3 @@ def extract_spheres(im):
     centers = [ndimage.center_of_mass(labels==i) for i in range(1, num_maxima+1)]
     radii = [data[center] for center in centers]
     return np.array(centers), np.array(radii)
-
-def gaussian_noise(shape, exp=0.5, mode='wrap'):
-    '''
-    mode : reflect, constant, nearest, mirror, wrap
-    '''
-    R = np.random.random(shape)
-    N = np.zeros_like(R)
-    for i in 2**np.arange(6):
-        N += ndimage.filters.gaussian_filter(R, i, mode=mode) * i**exp
-    N = np.true_divide(N, np.abs(N).max())
-    N = np.subtract(N, N.min())
-    return N
-
-def vtk_stack():
-    self.renWin.SetSize(*size)
-    w2if = vtk.vtkWindowToImageFilter()
-    w2if.SetInput(self.renWin)
-    writer = vtk.vtkPNGWriter()
-    for i in range(frames):
-        self.timeout()
-        w2if.Modified()
-        writer.SetFileName("tmp/{:0>3}.png".format(i))
-        writer.SetInput(w2if.GetOutput())
-        writer.Write()
-
-def save_gif(image_stack, outfile='animated.gif'):
-    slide_paths = []
-    for slide in image_stack.T:
-        f = NamedTemporaryFile(suffix='.png', delete=False)
-        misc.imsave(f, slide)
-        slide_paths.append( f.name )
-    call(["convert"] + slide_paths + [outfile])
