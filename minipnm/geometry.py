@@ -33,6 +33,8 @@ def intersecting(center, radius,
                  spans, midpoints, radii):
     '''
     takes in a sphere and multiple cylinders
+    - sphere(center, radius)
+    - cylinders(spans, midpoints, radii)
     returns a mask indicating which cylinders intersected the sphere
     
     Distance from point to (infinite) line(s):
