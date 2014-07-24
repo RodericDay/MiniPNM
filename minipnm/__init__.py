@@ -8,8 +8,8 @@ __copyright__ = 'Copyright 2014 PMEAL'
 
 from .graphics import *
 from .network import *
-from .algorithms import *
 from .misc import *
 from .utils import *
 from .binary import *
+from . import algorithms
 from . import geometry
