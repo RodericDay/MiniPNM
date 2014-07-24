@@ -1,5 +1,6 @@
 import numpy as np
 import minipnm as mini
+from minipnm.algorithms import shortest_path
 
 string = '''
 4445,2697,5115,718,2209,2212,654,4348,3079,6821,7668,3276,8874,4190,3785,2752,9473,7817,9137,496,7338,3434,7152,4355,4552,7917,7827,2460,2350,691,3514,5880,3145,7633,7199,3783,5066,7487,3285,1084,8985,760,872,8609,8051,1134,9536,5750,9716,9371,7619,5617,275,9721,2997,2698,1887,8825,6372,3014,2113,7122,7050,6775,5948,2758,1219,3539,348,7989,2735,9862,1263,8089,6401,9462,3168,2758,3748,5870
@@ -103,11 +104,11 @@ cmat1 = cmat.copy()
 cmat1.row = cmat.row[~blocked]
 cmat1.col = cmat.col[~blocked]
 cmat1.data = cmat.data[~blocked]
-path1 = mini.shortest_path(cmat1, top_left, bottom_right)
+path1 = shortest_path(cmat1, top_left, bottom_right)
 # any left start to any right end;    left, right, up, down:     994
-path2 = mini.shortest_path(cmat, left, right)
+path2 = shortest_path(cmat, left, right)
 # top-left to bottom-right;           left, right, up, down:    2297
-path3 = mini.shortest_path(cmat, top_left, bottom_right)
+path3 = shortest_path(cmat, top_left, bottom_right)
 
 array = mini.normalize(matrix.A1)
 array[path1] = 3

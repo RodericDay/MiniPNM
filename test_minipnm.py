@@ -180,13 +180,13 @@ def test_shortest_path():
     cmat1.row = cmat.row[~blocked]
     cmat1.col = cmat.col[~blocked]
     cmat1.data = cmat.data[~blocked]
-    path1 = mini.shortest_path(cmat1, top_left, bottom_right)
+    path1 = mini.algorithms.shortest_path(cmat1, top_left, bottom_right)
     assert matrix.A1[path1].sum() == 2427
     # any left start to any right end;    left, right, up, down:     994
-    path2 = mini.shortest_path(cmat, left, right)
+    path2 = mini.algorithms.shortest_path(cmat, left, right)
     assert matrix.A1[path2].sum() == 994
     # top-left to bottom-right;           left, right, up, down:    2297
-    path3 = mini.shortest_path(cmat, top_left, bottom_right)
+    path3 = mini.algorithms.shortest_path(cmat, top_left, bottom_right)
     assert matrix.A1[path3].sum() == 2297
 
 if __name__ == '__main__':

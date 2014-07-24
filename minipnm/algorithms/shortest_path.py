@@ -19,8 +19,7 @@ def shortest_path(cmat, start=None, end=None, heuristic=None):
 
     reached = set(start)
     exhausted = set()
-    vertex_costs = np.inf * np.ones(cmat.col.max()+1)
-    vertex_costs[start] = 0
+    vertex_costs = [0 if i in start else float('inf') for i in range(len(cmat.col))]
 
     while not all(i in exhausted for i in end):
         # exit condition
@@ -48,11 +47,11 @@ def shortest_path(cmat, start=None, end=None, heuristic=None):
         exhausted.add(si)
 
     # reconstruct path
-    best_exit = min(end, key=vertex_costs.item)
+    best_exit = min(end, key=lambda i: vertex_costs[i])
     path = [best_exit]
     while not any(i in path for i in start):
         parents = cmat.row[cmat.col==path[-1]]
-        best_parent = min(parents, key=vertex_costs.item)
+        best_parent = min(parents, key=lambda i: vertex_costs[i])
         path.append(best_parent)
     path.reverse()
 
