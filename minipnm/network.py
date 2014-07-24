@@ -428,8 +428,10 @@ class Bridson(Network):
         _points = np.nan_to_num(np.array(_points))
         self['cylinder_center_x'], self['cylinder_center_y'], self['cylinder_center_z'] = _points.T
 
-    def render(self):
+    def render(self, saturation_history=None):
         scene = Scene()
-        scene.add_spheres(self.points, self['sphere_radii'], color=(0,0,1), alpha=0.4)
+        scene.add_spheres(self.points, self['sphere_radii'], color=(1,1,1), alpha=0.4)
         scene.add_tubes(self.midpoints, self.spans, self['cylinder_radii'])
+        if saturation_history is not None:
+            scene.add_spheres(self.points, self['sphere_radii']*saturation_history*0.99, color=(0,0,1))
         scene.play()
