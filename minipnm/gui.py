@@ -106,12 +106,12 @@ def debug():
     import minipnm as mini
 
     pdf = (np.random.weibull(3) for _ in count())
-    network = mini.Bridson([20,20,2], pdf)
+    network = mini.Bridson([20,20,5], pdf)
     print network
 
     x,y,z = network.coords
     source = x==x.min()
-    history = mini.invasion(network, source, 1./network['sphere_radii'])
+    history = mini.algorithms.invasion(network, source, 1./network['sphere_radii'])
 
     spheres = mini.Spheres(network.points, network['sphere_radii'] * history, color=(0,0,1))
     wires = mini.Wires(network.points, network.pairs)

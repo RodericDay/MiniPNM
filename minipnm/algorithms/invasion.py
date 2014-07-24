@@ -1,3 +1,5 @@
+import numpy as np
+
 def invasion(network, sources, thresholds, sinks=None):
     network = network.copy()
 
