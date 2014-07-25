@@ -74,6 +74,43 @@ class Wires(Actor):
         self.polydata.GetPointData().SetScalars(self.colorArray(self.weights[i], self.cmap))
 
 
+class Surface(Actor):
+
+    def __init__(self, vertex_coords, edge_pairs, vertex_weights=None, alpha=1,
+                 cmap=None, offset=0):
+        self.offset = offset
+        self.polydata = vtk.vtkPolyData()
+        self.polydata.SetPoints(self.pointArray(vertex_coords))
+        self.polydata.SetLines(self.lineArray(edge_pairs))
+        self.mapper = vtk.vtkPolyDataMapper()
+        self.mapper.SetInput(self.polydata)
+        self.SetMapper(self.mapper)
+
+        if vertex_weights is None:
+            weights = np.atleast_2d([128 for _ in vertex_coords])
+        else:
+            weights = np.atleast_2d(vertex_weights)
+        self.weights = weights
+        self.cmap = cmap
+        self.update()
+        
+        self.GetProperty().SetOpacity(alpha)
+
+    def update(self, t=0):
+        i = t % len(self.weights)
+        values = self.weights[i]
+        # update z-positions
+        points = self.polydata.GetPoints()
+        for i, v in enumerate(values):
+            x,y,_ = points.GetPoint(i)
+            points.SetPoint(i, x, y, v+self.offset)
+        # update colors
+        normalized = np.true_divide(values, np.abs(self.weights).max())
+        normalized = np.subtract(normalized, self.weights.min())
+        colors = self.colorArray(normalized, self.cmap)
+        self.polydata.GetPointData().SetScalars(colors)
+
+
 class Tubes(Actor):
 
     def __init__(self, centers, vectors, radii, alpha=1, cmap=None):
@@ -204,6 +241,10 @@ class Scene(object):
     def add_wires(self, points, pairs, weights=None, alpha=1, cmap=None):
         wires = Wires(points, pairs, weights, alpha, cmap)
         self.add_actor(wires)
+
+    def add_surface(self, *args, **kwargs):
+        surface = Surface(*args, **kwargs)
+        self.add_actor(surface)
 
     def add_tubes(self, centers, vectors, radii, alpha=1, cmap=None):
         tubes = Tubes(centers, vectors, radii, alpha, cmap)

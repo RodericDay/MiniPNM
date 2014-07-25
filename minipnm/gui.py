@@ -80,10 +80,6 @@ class GUI(QtGui.QMainWindow):
         self.setCorner(QtCore.Qt.BottomLeftCorner, QtCore.Qt.LeftDockWidgetArea)
         self.toolBar.addAction(self.treeDockWidget.toggleViewAction())
 
-    def addActor(self, actor):
-        self.scene.ren.AddActor(actor)
-        self.scene.ren.ResetCamera()
-
     def plotXY(self, x, y):
         self.plotWidget.clear()
         self.plotWidget.plot(x,y, symbol='o')
