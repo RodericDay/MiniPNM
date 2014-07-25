@@ -17,6 +17,10 @@ def disabled_test_save_load_of_vtp_file():
     assert( len(network) == 0 )
     os.system("find . -name 'test.vtp' -delete")
 
+def test_print():
+    network = mini.Delaunay.random(100)
+    print( network )
+
 def test_basic_cubic():
     '''
     this is actually wrong

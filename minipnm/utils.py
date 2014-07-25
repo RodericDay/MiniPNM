@@ -1,3 +1,5 @@
+import numpy as np
+
 '''
 utils houses software developer tools and helpers
 '''
@@ -30,3 +32,23 @@ class FormulaDict(dict):
                          for key, value in sorted(self.items()))
 
 
+def property_from(list_of_keys, dtype=None, default=None):
+    '''
+    Shortcut for the process of creating thin properties from multiple arrays
+    based on their key entries
+
+    Gives the option of setting a dtype for casting
+    '''
+    def getter(self):
+        return np.vstack([self.get(key, default) for key in list_of_keys]).T
+
+    def setter(self, values):
+        values = np.nan_to_num(np.atleast_2d(values))
+        for key, array in zip(list_of_keys, values.T):
+            self[key] = array.astype(dtype) if dtype else array
+
+    def deleter(self):
+        for key in list_of_keys:
+            del self[key]
+
+    return property(getter, setter)

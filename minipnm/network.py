@@ -13,6 +13,7 @@ from .misc import laplacian
 from .algorithms import poisson_disk_sampling
 from .geometry import cylinders, intersecting
 from .graphics import Scene
+from . import utils
 
 ''' Subclassing rules
 
@@ -43,36 +44,8 @@ class Network(dict):
     def coords(self):
         return np.vstack([self['x'], self['y'], self['z']])
 
-    @property
-    def points(self):
-        ''' a graph consists of edges and vertices
-            in this *network* the points are vertices expressed in terms of the
-            coordinates associated with them
-        '''
-        return np.vstack([self['x'], self['y'], self['z']]).T
-
-    @points.setter
-    def points(self, _points):
-        _points = np.nan_to_num(np.array(_points))
-        self['x'], self['y'], self['z'] = _points.T
-
-    @property
-    def pairs(self):
-        ''' returns every 2-dimensional array representing an
-            edge or connection between two points
-        '''
-        return np.vstack([self.get('heads', []), self.get('tails', [])]).T
-
-    @pairs.setter
-    def pairs(self, _pairs):
-        ipairs = np.array(_pairs, dtype=int)
-        assert np.allclose(ipairs, _pairs)
-        self['heads'], self['tails'] = ipairs.T
-
-    @pairs.deleter
-    def pairs(self):
-        del self['heads']
-        del self['tails']
+    points = utils.property_from(['x','y','z'])
+    pairs = utils.property_from(['tails','heads'], dtype=int, default=[])
 
     @property
     def midpoints(self):
@@ -410,23 +383,8 @@ class Bridson(Network):
             self.spans = self.spans[safe]
             self['cylinder_radii'] = self['cylinder_radii'][safe]
 
-    @property
-    def spans(self):
-        return np.vstack([self['cylinder_length_x'], self['cylinder_length_y'], self['cylinder_length_z']]).T
-
-    @spans.setter
-    def spans(self, _points):
-        _points = np.nan_to_num(np.array(_points))
-        self['cylinder_length_x'], self['cylinder_length_y'], self['cylinder_length_z'] = _points.T
-
-    @property
-    def midpoints(self):
-        return np.vstack([self['cylinder_center_x'], self['cylinder_center_y'], self['cylinder_center_z']]).T
-
-    @midpoints.setter
-    def midpoints(self, _points):
-        _points = np.nan_to_num(np.array(_points))
-        self['cylinder_center_x'], self['cylinder_center_y'], self['cylinder_center_z'] = _points.T
+    spans = utils.property_from(['cylinder_length_x','cylinder_length_y','cylinder_length_z'])
+    midpoints = utils.property_from(['cylinder_center_x','cylinder_center_y','cylinder_center_z'])
 
     def render(self, saturation_history=None):
         scene = Scene()
