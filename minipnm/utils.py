@@ -1,8 +1,3 @@
-import gzip
-import numpy as np
-import matplotlib.pyplot as plt
-from scipy import misc, ndimage
-
 '''
 utils houses software developer tools and helpers
 '''

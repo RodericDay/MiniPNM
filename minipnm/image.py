@@ -28,6 +28,7 @@ def save_gif(image_stack, outfile='animated.gif'):
         misc.imsave(f, slide)
         slide_paths.append( f.name )
     call(["convert"] + slide_paths + [outfile])
+    call(["rm"] + slide_paths)
 
 def view_stack(image_stack):
     '''

@@ -1,3 +1,5 @@
+from tempfile import NamedTemporaryFile
+from subprocess import call
 from itertools import count
 import numpy as np
 from matplotlib import cm
@@ -165,6 +167,27 @@ class Scene(object):
             actor = self.ren.GetActors().GetItemAsObject(aid)
             actor.update(t)
         self.renWin.Render()
+
+    def save(self, frames, outfile='animated.gif'):
+        '''
+        takes a snapshot of the frames at given t, and returns the paths
+        '''
+        windowToImage = vtk.vtkWindowToImageFilter()
+        windowToImage.SetInput(self.renWin)
+        writer = vtk.vtkPNGWriter()
+        writer.SetInput(windowToImage.GetOutput())
+
+        slide_paths = []
+        for t in frames:
+            f = NamedTemporaryFile(suffix='.png', delete=False)
+            self.update_all(t=t)
+            windowToImage.Modified()
+            writer.SetFileName(f.name)
+            writer.Write()
+            slide_paths.append( f.name )
+
+        call(["convert"] + slide_paths + [outfile])
+        call(["rm"] + slide_paths)
 
     def play(self, timeout=1):
         self.iren.Initialize()
