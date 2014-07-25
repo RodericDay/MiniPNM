@@ -435,3 +435,18 @@ class Bridson(Network):
         if saturation_history is not None:
             scene.add_spheres(self.points, self['sphere_radii']*saturation_history*0.99, color=(0,0,1))
         scene.play()
+
+
+class Voronoi(Network):
+    '''
+    Network based on Voronoi tessellation, with non-uniform pore geometry
+
+    Storage involves an additional set of points (vx, vy, vz), and an array of
+    indexes (vi) coupled with an array of numbers of points (vn) that allows us
+    to determine which intersecting points belong to each point.
+
+    Throats are determined by noting that any two points which share 3+ indexes
+    are connected by a surface
+    '''
+    def __init__(self):
+        raise NotImplementedError()
