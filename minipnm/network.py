@@ -11,9 +11,9 @@ from scipy import spatial, sparse
 
 from .misc import laplacian
 from .algorithms import poisson_disk_sampling
-from .graphics import Scene
 from . import utils
 from . import geometry
+from . import graphics
 
 ''' Subclassing rules
 
@@ -117,7 +117,16 @@ class Network(dict):
         minipnm.save_vtp(self, filename)
         self.filename = filename
 
-    def render(self, values=None, *args, **kwargs):
+    def render(self, scene=None, *args, **kwargs):
+        if scene is None:
+            scene = graphics.Scene()
+        
+        scene.add_actors(self.actors(*args, **kwargs))
+
+        if scene is None:
+            scene.play()
+
+    def actors(self, values=None):
         try:
             # to load as if given a key
             values = self[values]
@@ -130,9 +139,8 @@ class Network(dict):
             # probably an array, but make sure it fits!
             assert np.array(values).shape[-1] == self.order
         finally:
-            scene = Scene()
-            scene.add_wires(self.points, self.pairs, values, **kwargs)
-            scene.play()
+            wires = graphics.Wires(self.points, self.pairs, values)
+        return [wires]
 
     def merge(self, other, axis=2, spacing=None, centering=False, stitch=False):
         new = Network()
@@ -372,13 +380,15 @@ class Bridson(Network):
     spans = utils.property_from(['cylinder_length_x','cylinder_length_y','cylinder_length_z'])
     midpoints = utils.property_from(['cylinder_center_x','cylinder_center_y','cylinder_center_z'])
 
-    def render(self, saturation_history=None):
-        scene = Scene()
-        scene.add_spheres(self.points, self['sphere_radii'], color=(1,1,1), alpha=0.4)
-        scene.add_tubes(self.midpoints, self.spans, self['cylinder_radii'])
-        if saturation_history is not None:
-            scene.add_spheres(self.points, self['sphere_radii']*saturation_history*0.99, color=(0,0,1))
-        scene.play()
+    def actors(self, saturation_history=None):
+        shells = graphics.Spheres(self.points, self['sphere_radii'], color=(1,1,1), alpha=0.4)
+        tubes = graphics.Tubes(self.midpoints, self.spans, self['cylinder_radii'])
+        if saturation_history is None:
+            return [shells, tubes]
+
+        history = graphics.Spheres(self.points, self['sphere_radii']*saturation_history*0.99, color=(0,0,1))
+        return [shells, tubes, history]
+        
 
 
 class Voronoi(Network):

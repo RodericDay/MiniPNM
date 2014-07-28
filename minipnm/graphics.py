@@ -234,22 +234,6 @@ class Scene(object):
         self.update_all()
         self.iren.Start()
         
-    def add_actor(self, actor):
-        self.ren.AddActor(actor)
-
-    # legacy functions
-    def add_wires(self, points, pairs, weights=None, alpha=1, cmap=None):
-        wires = Wires(points, pairs, weights, alpha, cmap)
-        self.add_actor(wires)
-
-    def add_surface(self, *args, **kwargs):
-        surface = Surface(*args, **kwargs)
-        self.add_actor(surface)
-
-    def add_tubes(self, centers, vectors, radii, alpha=1, cmap=None):
-        tubes = Tubes(centers, vectors, radii, alpha, cmap)
-        self.add_actor(tubes)
-
-    def add_spheres(self, points, radii, alpha=1, color=(1,1,1)):
-        spheres = Spheres(points, radii, alpha, color)
-        self.add_actor(spheres)
+    def add_actors(self, list_of_actors):
+        for actor in list_of_actors:
+            self.ren.AddActor(actor)
