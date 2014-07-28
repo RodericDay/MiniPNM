@@ -1,6 +1,9 @@
 import numpy as np
 import minipnm as mini
 
+def drop_coplanar(points):
+    not_coplanar = np.diff(points, axis=0).sum(axis=0).nonzero()
+    return points.T[not_coplanar].T
 
 def cylinders(centers, radii, pairs=None):
     '''

@@ -11,9 +11,9 @@ from scipy import spatial, sparse
 
 from .misc import laplacian
 from .algorithms import poisson_disk_sampling
-from .geometry import cylinders, intersecting
 from .graphics import Scene
 from . import utils
+from . import geometry
 
 ''' Subclassing rules
 
@@ -110,7 +110,7 @@ class Network(dict):
 
     def boundary(self):
         all_points = self.indexes
-        boundary_points = spatial.ConvexHull(Delaunay.drop_coplanar(self.points)).vertices
+        boundary_points = spatial.ConvexHull(geometry.drop_coplanar(self.points)).vertices
         return np.in1d(all_points, boundary_points).astype(bool)
 
     def save(self, filename):
@@ -314,27 +314,13 @@ class Delaunay(Network):
 
     @staticmethod
     def edges_from_points(points, mask=None, directed=True):
-        triangulation = spatial.Delaunay(Delaunay.drop_coplanar(points))
-        edges = set()
-        for unindexed in triangulation.vertices:
-            indexed = mask[unindexed] if mask else unindexed
-            cyclable = itertools.cycle(unindexed)
-            next(cyclable)
-            for edge in zip(unindexed, cyclable):
-                edge = tuple(sorted(edge))
-                if edge not in edges:
-                    edges.add(edge)
-
-        one_way = np.array(list(edges))
+        noncoplanar = geometry.drop_coplanar(points)
+        edges = np.vstack(spatial.Voronoi(noncoplanar).ridge_points)
+        if mask:
+            edges = mask[edges]
         if directed:
-            other_way = np.fliplr(one_way)
-            return np.vstack([one_way, other_way])
-        return one_way
-
-    @staticmethod
-    def drop_coplanar(points):
-        not_coplanar = np.diff(points, axis=0).sum(axis=0).nonzero()
-        return points.T[not_coplanar].T
+            edges = np.vstack([edges, np.fliplr(edges)])
+        return edges
 
 
 class PackedSpheres(Network):
@@ -371,10 +357,10 @@ class Bridson(Network):
         self.points, self['sphere_radii'] = np.array(points), np.array(radii)
         self.pairs = Delaunay.edges_from_points(self.points)
         self['cylinder_radii'] = self['sphere_radii'][self.pairs].min(axis=1)/4.
-        self.spans, self.midpoints = cylinders(self.points, self['sphere_radii'], self.pairs)
+        self.spans, self.midpoints = geometry.cylinders(self.points, self['sphere_radii'], self.pairs)
 
         for center, radius in zip(self.points, self['sphere_radii']):
-            safe = ~intersecting(center, radius,
+            safe = ~geometry.intersecting(center, radius,
                                  self.spans, self.midpoints, self['cylinder_radii'])
             
             # deletes and stuff
