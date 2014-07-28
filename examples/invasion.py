@@ -1,39 +1,43 @@
-import itertools as it
 import numpy as np
 import minipnm as mini
 
-network = mini.Bridson([40,30,5])
-
+noise = mini.image.gaussian_noise([50,20])
+network = mini.Cubic(noise, noise.shape)
 x,y,z = network.coords
-left = x < np.percentile(x, 10)
-right = x > np.percentile(x, 90)
+left = x < np.percentile(x,10)
+right = x > np.percentile(x,90)
+oxygen_dirichlet = {0 : left, 1 : right}
 
-history = [np.zeros(network.order, dtype=bool)]
-pden, oden = [], []
-while not all(history[-1]==True):
-    state = history[-1].copy()
+proton = x.max() - x
+floodable = network.copy()
+flood_history, activity, oxygen = [], [], []
+for i in range(300):
+    if i == 0:
+        is_water = np.zeros(network.order, dtype=bool)
+    else:
+        is_water = flood_history[-1].copy()
+        new = np.random.choice((~is_water).nonzero()[0], 3)
+        is_water[new] = True
 
-    cut = network.copy()
-    cut.prune(state)
-    pden.append(mini.algorithms.bvp.solve(cut.laplacian, {20 : left, 0 : right}))
-    oden.append(mini.algorithms.bvp.solve(cut.laplacian, {0 : left, 10 : right}))
+    floodable.prune(is_water)
+    diffused = mini.algorithms.bvp.solve(floodable.laplacian, oxygen_dirichlet)
+    activity_rate = (proton * diffused)**3
 
-    newly_flooded = np.random.choice((state==False).nonzero()[0])
-    state[newly_flooded] = True
-    history.append(state)
-else:
-    pden.append(pden[-1])
-    oden.append(oden[-1])
+    flood_history.append(is_water)
+    activity.append(activity_rate)
+    oxygen.append(diffused)
 
-x = np.arange(len(history))
-y = (network['sphere_radii'] * history).sum(axis=1)
+
+activity_layer = network.copy()
+activity_layer['z'] = z + 20
+
+oxygen_layer = network.copy()
+oxygen_layer['z'] = z + 40
 
 gui = mini.GUI()
-gui.plotXY(x,y)
-gui.scene.add_spheres(network.points, network['sphere_radii'], alpha=0.3)
-gui.scene.add_spheres(network.points, network['sphere_radii'] * history, color=(0,0,1))
-gui.scene.add_tubes(network.midpoints, network.spans, network['cylinder_radii'])
-gui.scene.add_surface(network.points, network.pairs, pden, cmap='bone_r', offset=10)
-gui.scene.add_surface(network.points, network.pairs, oden, cmap='gist_heat_r', offset=10)
-# gui.scene.add_spheres(network.points, network['sphere_radii'] * history, color=(0,0,1))
+scene = gui.scene
+network.render(scene, values=flood_history)
+activity_layer.render(scene, values=activity, cmap='hot')
+oxygen_layer.render(scene, values=oxygen, cmap='Greens_r')
+gui.plotXY(range(300), [sum(a) for a in activity])
 gui.run()
