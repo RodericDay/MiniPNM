@@ -118,12 +118,14 @@ class Network(dict):
         self.filename = filename
 
     def render(self, scene=None, *args, **kwargs):
+        wait = True
         if scene is None:
             scene = graphics.Scene()
+            wait = False
         
         scene.add_actors(self.actors(*args, **kwargs))
 
-        if scene is None:
+        if not wait:
             scene.play()
 
     def actors(self, values=None):
