@@ -11,18 +11,27 @@ class Actor(vtk.vtkActor):
     def __init__(self):
         raise NotImplementedError()
 
-    def pointArray(self, vertex_coords):
+    def pointArray(self, _points):
         points = vtk.vtkPoints()
-        for x,y,z in vertex_coords:
+        for x,y,z in _points:
             points.InsertNextPoint(x, y, z)
         return points
 
-    def lineArray(self, edge_pairs):
+    def lineArray(self, _lines):
         lines = vtk.vtkCellArray()
-        for t,h in edge_pairs:
+        for id_set in _lines:
             l = vtk.vtkIdList()
-            l.InsertNextId(t)
-            l.InsertNextId(h)
+            for i in id_set:
+                l.InsertNextId(i)
+            lines.InsertNextCell(l)
+        return lines
+
+    def faceArray(self, faces):
+        lines = vtk.vtkCellArray()
+        for face in faces:
+            l = vtk.vtkIdList()
+            for i in face:
+                l.InsertNextId(i)
             lines.InsertNextCell(l)
         return lines
 

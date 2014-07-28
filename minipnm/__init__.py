@@ -6,12 +6,13 @@ __author__ = 'PMEAL'
 __license__ = 'MIT'
 __copyright__ = 'Copyright 2014 PMEAL'
 
-from .graphics import *
 from .network import *
+from .graphics import Scene
 from .misc import *
 from .utils import *
 from .binary import *
 from . import algorithms
 from . import geometry
 from . import image
+from . import graphics
 from .gui import GUI
