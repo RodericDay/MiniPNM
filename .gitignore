@@ -5,3 +5,4 @@ kernprof.py
 .DS_STORE
 minipnm.egg-info/
 scratch*
+examples/

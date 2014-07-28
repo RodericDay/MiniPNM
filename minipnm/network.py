@@ -405,4 +405,15 @@ class Voronoi(Network):
     are connected by a surface
     '''
     def __init__(self):
-        raise NotImplementedError()
+        bridson = mini.Bridson([20,20,10])
+        # the shells are formed by the vertices and regions
+        # the input can be recovered from points
+        # and Delaunay is ridge_points
+        voronoi = Voronoi(bridson.points)
+        # get points
+        points = voronoi.vertices
+        # some points are invalid
+        bad_ids = {-1} | set(np.any(np.abs(points)>bridson.dims//2, axis=1).nonzero()[0])
+        # only pure regions allowed
+        good_ids = set(it.chain.from_iterable(r for r in voronoi.regions if not (set(r) & bad_ids)))
+        faces = [v+v[:1] for v in voronoi.ridge_vertices if good_ids.issuperset(v)]
