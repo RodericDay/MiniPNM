@@ -17,8 +17,8 @@ def gaussian_noise(shape, exp=1, mode='wrap'):
     N = np.zeros_like(R)
     for sigma in 2**np.arange(6):
         N += ndimage.filters.gaussian_filter(R, sigma, mode=mode) * sigma**exp
-    N = np.true_divide(N, np.abs(N).max())
     N = np.subtract(N, N.min())
+    N = np.true_divide(N, np.abs(N).max())
     return N
 
 def save_gif(image_stack, outfile='animated.gif'):

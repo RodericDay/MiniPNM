@@ -128,7 +128,7 @@ class Network(dict):
         if not wait:
             scene.play()
 
-    def actors(self, values=None):
+    def actors(self, values=None, **kwargs):
         try:
             # to load as if given a key
             values = self[values]
@@ -141,7 +141,7 @@ class Network(dict):
             # probably an array, but make sure it fits!
             assert np.array(values).shape[-1] == self.order
         finally:
-            wires = graphics.Wires(self.points, self.pairs, values)
+            wires = graphics.Wires(self.points, self.pairs, values, **kwargs)
         return [wires]
 
     def merge(self, other, axis=2, spacing=None, centering=False, stitch=False):
