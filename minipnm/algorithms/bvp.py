@@ -8,10 +8,6 @@ def solve(system, dirichlet, neumann=None):
     the length of the Dirichlet masks should be of network.order,
     while Neumann masks are the indices of the tail and head of any specified
     edge gradient.
-
-    example:
-    >>> dirichlet = { 1 : x == x.min() }
-    >>> neumann = { 5 : network.cut(x == x.max(), network.indexes).T }
     '''
     A, b = build(system, dirichlet, neumann, fast=True)
     x = spsolve(A, b).round(5)
