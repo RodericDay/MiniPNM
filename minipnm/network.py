@@ -187,10 +187,10 @@ class Network(dict):
         '''
         imask = self.indexes[np.array(mask).nonzero()]
         heads, tails = self.pairs.T
-        pair_mask = np.in1d(heads, imask) & ~np.in1d(tails, imask)
+        pair_mask = np.in1d(heads, imask) == ~np.in1d(tails, imask)
 
         if values is None:
-            return pair_mask.nonzero()[0] # 1 dimension only
+            return pair_mask
         else:
             tails, heads = values[self.pairs[pair_mask]].T
             if not bijective:
