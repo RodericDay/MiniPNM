@@ -1,31 +1,41 @@
 import numpy as np
 import minipnm as mini
 
+output = 200.
+
 noise = mini.image.gaussian_noise([50,20])
+max_out = output / noise.size * 5
+
 network = mini.Cubic(noise, noise.shape)
 x,y,z = network.coords
-left = x < np.percentile(x,10)
-right = x > np.percentile(x,90)
-oxygen_dirichlet = {0 : left, 1 : right}
+left = x < np.percentile(x,5)
+right = x > np.percentile(x,95)
+oxygen_dirichlet = {1 : right}
 
-proton = x.max() - x
+proton = (x.max() - x)
 floodable = network.copy()
 flood_history, activity, oxygen = [], [], []
-for i in range(300):
-    if i == 0:
-        is_water = np.zeros(network.order, dtype=bool)
-    else:
-        is_water = flood_history[-1].copy()
-        new = np.random.choice((~is_water).nonzero()[0], 3)
-        is_water[new] = True
-
+is_water = np.zeros(network.order, dtype=bool)
+while not all(is_water):
     floodable.prune(is_water)
-    diffused = mini.algorithms.bvp.solve(floodable.laplacian, oxygen_dirichlet)
-    activity_rate = (proton * diffused)**3
+
+    C = floodable.laplacian
+    C[range(floodable.order), range(floodable.order)] += 0.00001 * proton
+    A, b = mini.algorithms.bvp.build(C, oxygen_dirichlet)
+    diffused = mini.algorithms.bvp.spsolve(A, b).round(5)
+
+    activity_rate = proton * diffused
+    activity_rate*= (200. / sum(activity_rate))
+    activity_rate = activity_rate.clip(0,max_out)
 
     flood_history.append(is_water)
     activity.append(activity_rate)
     oxygen.append(diffused)
+
+    new = np.random.choice((~is_water).nonzero()[0], 3)
+    is_water = flood_history[-1].copy()
+    is_water[new] = True
+
 
 
 activity_layer = network.copy()
@@ -39,5 +49,5 @@ scene = gui.scene
 network.render(scene, values=flood_history)
 activity_layer.render(scene, values=activity, cmap='hot')
 oxygen_layer.render(scene, values=oxygen, cmap='Greens_r')
-gui.plotXY(range(300), [sum(a) for a in activity])
+gui.plotXY(range(len(activity)), [sum(a) for a in activity])
 gui.run()
