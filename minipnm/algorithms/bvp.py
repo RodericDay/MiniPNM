@@ -44,12 +44,12 @@ def build(system, dirichlet, neumann=None, fast=False):
     reindex = np.hstack(reindex).astype('int32')
 
     if fast:
-        A = sparse.vstack(elements_of_A)
+        A = sparse.vstack(e for e in elements_of_A if e.nnz)
         b = np.hstack(elements_of_b)
         return A, b
 
     # reorders the system to preserve original structure
-    A = sparse.vstack(elements_of_A, format='csc')
+    A = sparse.vstack((e for e in elements_of_A if e.nnz), format='csc')
     A.indices = reindex[A.indices]
     b = np.hstack(elements_of_b)
     b[reindex] = b.copy()
