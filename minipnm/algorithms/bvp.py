@@ -19,7 +19,8 @@ def build(system, dirichlet, neumann=None, fast=False):
 
     free = n_conditions_imposed == 0
     D = sparse.eye(system.shape[0]).tocsr()
-    elements_of_A, elements_of_b = [system[free]], [np.zeros(free.sum())]
+    elements_of_A = [system[free]] if any(free) else []
+    elements_of_b = [np.zeros(free.sum())]
     reindex = free.nonzero()
 
     for value, mask in dirichlet.items():
