@@ -4,9 +4,15 @@ import minipnm as mini
 output = 200.
 
 noise = mini.image.gaussian_noise([50,20])
-max_out = output / noise.size * 5
-
 network = mini.Cubic(noise, noise.shape)
+
+# pts = np.random.rand(1000, 3)
+# pts.T[0] *= 50
+# pts.T[1] *= 20
+# pts.T[2] *= 2
+# network = mini.Delaunay(pts)
+
+max_out = output / network.order * 5
 x,y,z = network.coords
 left = x < np.percentile(x,5)
 right = x > np.percentile(x,95)
@@ -32,7 +38,7 @@ while not all(is_water):
     activity.append(activity_rate)
     oxygen.append(diffused)
 
-    new = np.random.choice((~is_water).nonzero()[0], 3)
+    new = np.random.choice((~is_water).nonzero()[0], min(1,network.order//100))
     is_water = flood_history[-1].copy()
     is_water[new] = True
 
