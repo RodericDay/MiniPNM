@@ -174,7 +174,7 @@ class Network(dict):
 
         return new
 
-    def cut(self, mask, values=None, bijective=False):
+    def cut(self, mask, values=None, bijective=False, directed=True):
         '''
         returns id of throats where the the tail is masked and the head is not.
         (ie: True for sources).
@@ -184,10 +184,17 @@ class Network(dict):
 
         the bijective condition, if enabled, drops any edges that are not
         one-to-one
+
+        if directed is set to false, the method will ignore which sides of the
+        mask are true and which are false. default is to consider throats
+        where the mask is a selection and we want throats reaching out of it
         '''
         imask = self.indexes[np.array(mask).nonzero()]
         heads, tails = self.pairs.T
-        pair_mask = np.in1d(heads, imask) == ~np.in1d(tails, imask)
+        if directed:
+            pair_mask = np.in1d(heads, imask) & ~np.in1d(tails, imask)
+        else:
+            pair_mask = np.in1d(heads, imask) == ~np.in1d(tails, imask)
 
         if values is None:
             return pair_mask
