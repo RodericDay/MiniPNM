@@ -59,20 +59,6 @@ def test_rectilinear_integrity_2d():
     M = np.where(R > R.mean(), R, 0)
     assert np.allclose(M, O)
 
-def test_linear_solver():
-    R = mini.image.gaussian_noise([10, 10, 10])
-    network = mini.Cubic(R)
-    network = network - (R<np.percentile(R, 10))
-    x,y,z = network.coords
-    l = x == x.min()
-    r = x == x.max()
-    dbcs = { 2 : l, 1 : r }
-    sol = mini.algorithms.bvp.solve(network.laplacian, dbcs)
-
-    l_flux = np.subtract(*network.cut(l, sol)).sum()
-    r_flux = -np.subtract(*network.cut(r, sol)).sum()
-    assert np.allclose(l_flux, r_flux)
-
 def test_subtract_all():
     network = mini.Cubic.empty([3,3,3])
     reduced = network - np.ones(network.order).astype(bool)

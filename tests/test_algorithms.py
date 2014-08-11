@@ -1,6 +1,20 @@
 import numpy as np
 import minipnm as mini
 
+def test_linear_solver():
+    R = mini.image.gaussian_noise([10, 10, 10])
+    network = mini.Cubic(R)
+    network = network - (R<np.percentile(R, 10))
+    x,y,z = network.coords
+    l = x == x.min()
+    r = x == x.max()
+    dbcs = { 2 : l, 1 : r }
+    sol = mini.algorithms.bvp.solve(network.laplacian, dbcs)
+
+    l_flux = np.subtract(*network.cut(l, sol)).sum()
+    r_flux = -np.subtract(*network.cut(r, sol)).sum()
+    assert np.allclose(l_flux, r_flux)
+
 def test_invasion():
     network = mini.Cubic.empty([20,20])
     x,y,z = network.coords
@@ -26,18 +40,16 @@ def test_shortest_path():
     bottom_right = network.indexes[(x==x.max()) & (y==y.min())]
     left = network.indexes[x==x.min()]
     right = network.indexes[x==x.max()]
-    # top-left to bottom-right;           right and down:           2427
+    # block right and upwards directions
     blocked = (x[cmat.row] > x[cmat.col]) | (y[cmat.row] < y[cmat.col])
-    np.set_printoptions(linewidth=200)
     cmat1 = cmat.copy()
     cmat1.row = cmat.row[~blocked]
     cmat1.col = cmat.col[~blocked]
     cmat1.data = cmat.data[~blocked]
+    # calls
     path1 = mini.algorithms.shortest_path(cmat1, top_left, bottom_right)
     assert matrix.A1[path1].sum() == 2427
-    # any left start to any right end;    left, right, up, down:     994
     path2 = mini.algorithms.shortest_path(cmat, left, right)
     assert matrix.A1[path2].sum() == 994
-    # top-left to bottom-right;           left, right, up, down:    2297
     path3 = mini.algorithms.shortest_path(cmat, top_left, bottom_right)
     assert matrix.A1[path3].sum() == 2297
