@@ -1,6 +1,11 @@
 import numpy as np
 import minipnm as mini
 
+def test_invasion():
+    network = mini.Cubic.empty([20,20])
+    x,y,z = network.coords
+    sol = mini.algorithms.invasion(network.adjacency_matrix, x==x.min(), x==x.max())
+
 def test_shortest_path():
     string = '''
     131 673 234 103  18
