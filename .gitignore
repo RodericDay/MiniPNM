@@ -6,3 +6,4 @@ kernprof.py
 minipnm.egg-info/
 scratch*
 examples/
+*.sublime*
