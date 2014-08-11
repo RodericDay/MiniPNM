@@ -1,30 +1,29 @@
 import numpy as np
 
-def invasion(network, sources, thresholds, sinks=None):
-    network = network.copy()
-
-    # assume throat access is bound by minimal pore access
-    throat_thresholds = thresholds[network.pairs].max(axis=1)
+def invasion(adjacency_matrix, sources, sinks=None):
+    tails = adjacency_matrix.row
+    heads = adjacency_matrix.col
+    conductance = adjacency_matrix.data
 
     # Assign a list of pores that are initially filled with liquid water
-    saturation = [sources]
-
+    state = sources.copy()
+    history = [state]
+    
     # Repeat until percolation or predefined stopping point
-    while True:
+    while not all(state):
         # Identify interfacial throats (between unsaturated and saturated pores)
-        interfacial_throats = network.cut(saturation[-1])
+        saturated = state.nonzero()[0]
+        interfacial_throats = np.in1d(tails, saturated) & ~np.in1d(heads, saturated)
 
         # Check for breakthrough conditions
-        if sinks is not None and any(saturation[-1][sinks]): break
-        elif len(interfacial_throats) == 0: break
-
+        if sinks is not None and any(state[sinks]): break
+        elif not any(interfacial_throats): break
+        
         # Identify the interfacial throat, thmin, with lowest entry pressure
-        entry_pressures = throat_thresholds[interfacial_throats]
-        th_min = interfacial_throats[entry_pressures.argmin()]
-
-        # Invade any air-filled pore adjacent to thmin with liquid water
-        new_saturation = saturation[-1].copy()
-        new_saturation[network.pairs[th_min]] = 1
-        saturation.append(new_saturation)
-
-    return np.vstack(saturation)
+        thmin = min(interfacial_throats.nonzero()[0], key=conductance.item)
+        next_fill = heads[thmin]
+        conductance[next_fill] = 100
+        state[next_fill] = True
+        history.append(state.copy())
+        
+    return np.vstack(history)
