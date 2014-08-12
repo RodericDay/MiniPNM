@@ -114,4 +114,4 @@ array = mini.normalize(matrix.A1)
 array[path1] = 3
 array[path2] = 4
 array[path3] = 5
-network.render(array)
+network.render(values=array)
