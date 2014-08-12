@@ -22,13 +22,13 @@ from . import graphics
 
     __init__ must *somehow* append coordinate (x,y,z) and connectivity (heads & tails)
     arrays to the network. that's its role. you can add many other attributes if
-    you so wish, but you MUST provide those two. the `points` and 
+    you so wish, but you MUST provide those two. the `points` and
     `pairs` property setters are offered for convenience
 
     The other main rule is that aside from methods and properties, these objects
     should essentially be *just* dictionaries. One way to think about this is that
     the answer to the question "will I miss any data if I just write down the
-    results of network.items?" should be NO. 
+    results of network.items?" should be NO.
 
     Convenience methods that automate some work (ie. import an image from a file)
     can be found in the `misc` module
@@ -70,7 +70,7 @@ class Network(dict):
     @property
     def laplacian(self):
         return laplacian(self.adjacency_matrix)
-    
+
     @property
     def labels(self):
         return sparse.csgraph.connected_components(self.adjacency_matrix)[1]
@@ -91,7 +91,7 @@ class Network(dict):
     def dims(self):
         '''
         the `or 1` hack is somewhat ugly, but is a reasonable way to handle
-        unit-thin networks. 
+        unit-thin networks.
         '''
         w = self['x'].max() - self['x'].min() or 1
         h = self['y'].max() - self['y'].min() or 1
@@ -122,7 +122,7 @@ class Network(dict):
         if scene is None:
             scene = graphics.Scene()
             wait = False
-        
+
         scene.add_actors(self.actors(*args, **kwargs))
 
         if not wait:
@@ -167,7 +167,9 @@ class Network(dict):
         new.pairs = np.vstack([self.pairs, other.pairs+self.order])
 
         # merge the rest
-        for key in set(self.keys()+other.keys())-{'x','y','z','heads','tails'}:
+
+        for key in set(itertools.chain(self.keys(),other.keys())) - \
+            {'x','y','z','heads','tails'}:
             values_self = self.get(key, -np.ones(self.order))
             values_other = other.get(key, -np.ones(other.order))
             new[key] = np.hstack([values_self, values_other])
@@ -180,7 +182,7 @@ class Network(dict):
         (ie: True for sources).
 
         for convenience, if a value array is given, the corresponding values
-        are returned instead of indices 
+        are returned instead of indices
 
         the bijective condition, if enabled, drops any edges that are not
         one-to-one
@@ -379,7 +381,7 @@ class Bridson(Network):
         for center, radius in zip(self.points, self['sphere_radii']):
             safe = ~geometry.intersecting(center, radius,
                                  self.spans, self.midpoints, self['cylinder_radii'])
-            
+
             # deletes and stuff
             self.pairs = self.pairs[safe]
             self.midpoints = self.midpoints[safe]
@@ -397,7 +399,7 @@ class Bridson(Network):
 
         history = graphics.Spheres(self.points, self['sphere_radii']*saturation_history*0.99, color=(0,0,1))
         return [shells, tubes, history]
-        
+
 
 
 class Voronoi(Network):

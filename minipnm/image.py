@@ -16,7 +16,8 @@ def gaussian_noise(shape, exp=1, mode='wrap'):
     R = np.random.random(shape)
     N = np.zeros_like(R)
     for sigma in 2**np.arange(6):
-        N += ndimage.filters.gaussian_filter(R, sigma, mode=mode) * sigma**exp
+        layer = ndimage.filters.gaussian_filter(R, int(sigma), mode=mode)
+        N += layer * sigma**exp
     N = np.subtract(N, N.min())
     N = np.true_divide(N, np.abs(N).max())
     return N
