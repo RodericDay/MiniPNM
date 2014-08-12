@@ -3,13 +3,15 @@ import io, bisect
 import numpy as np
 from scipy import misc
 
-from PyQt4 import QtGui, QtCore
-import pyqtgraph as QtGraph
+try:
+    from vtk.qt4.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor
+    from .graphics import Scene
 
-import vtk
-from vtk.qt4.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor
+    from PyQt4 import QtGui, QtCore
+    import pyqtgraph as QtGraph
+except ImportError:
+    QtGui = type("", (), {"QWidget": object, "QMainWindow": object})
 
-from .graphics import Scene
 
 class Canvas(QtGui.QWidget):
 

@@ -3,8 +3,11 @@ from subprocess import call
 from itertools import count
 import numpy as np
 from matplotlib import cm
-import vtk
 
+try:
+    import vtk
+except ImportError:
+    vtk = type("", (), {'vtkActor': object})
 
 class Actor(vtk.vtkActor):
 
@@ -75,7 +78,7 @@ class Wires(Actor):
         self.weights = weights
         self.cmap = cmap
         self.update()
-        
+
         self.GetProperty().SetOpacity(alpha)
 
     def update(self, t=0):
@@ -102,7 +105,7 @@ class Surface(Actor):
         self.weights = weights
         self.cmap = cmap
         self.update()
-        
+
         self.GetProperty().SetOpacity(alpha)
 
     def update(self, t=0):
@@ -202,7 +205,7 @@ class Scene(object):
 
         self.ren = vtk.vtkRenderer()
         self.renWin.AddRenderer(self.ren)
-        
+
         if fix_camera:
             camera = vtk.vtkInteractorStyleTrackballCamera()
             self.iren.SetInteractorStyle(camera)
@@ -242,7 +245,7 @@ class Scene(object):
             self.timer = self.iren.CreateRepeatingTimer(timeout)
         self.update_all()
         self.iren.Start()
-        
+
     def add_actors(self, list_of_actors):
         for actor in list_of_actors:
             self.ren.AddActor(actor)
