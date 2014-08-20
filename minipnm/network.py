@@ -276,22 +276,21 @@ class Network(dict):
 class Cubic(Network):
 
     @classmethod
-    def empty(cls, dims, shape=None):
-        arr = np.zeros(dims)
-        return cls(arr, shape if shape is not None else arr.shape)
+    def from_source(cls, im):
+        network = cls(im.shape)
+        network['source'] = im.ravel()
+        return network
+    
+    def __init__(self, shape, spacing=None, bbox=None):
+        arr = np.atleast_3d(np.empty(shape))
 
-    def __init__(self, ndarray, dims=[1,1,1]):
-        ndarray = np.atleast_3d(ndarray)
-        dims = tuple(dims) + (1,) * (3 - len(dims))
+        self.points = np.array([i for i,v in np.ndenumerate(arr)], dtype=float)
+        if spacing is not None:
+            self.points *= spacing
+        elif bbox is not None:
+            self.points = self.points * ( bbox / self.points.max(axis=0) )
 
-        self['source'] = np.array(ndarray.flat)
-
-        points_rel = np.array(
-            [idx for idx,val in np.ndenumerate(ndarray)]).astype(float)
-        points_abs = points_rel * dims / np.array(np.subtract(ndarray.shape,1)).clip(1, np.inf)
-        self.points = points_abs
-
-        I = np.arange(ndarray.size).reshape(ndarray.shape)
+        I = np.arange(arr.size).reshape(arr.shape)
         tails, heads = [], []
         for T,H in [
             (I[:,:,:-1], I[:,:,1:]),
@@ -308,14 +307,12 @@ class Cubic(Network):
     def resolution(self):
         return np.array([len(set(d)) for d in self.coords])
 
-    def asarray(self, values=None):
+    def asarray(self, values):
         _ndarray = np.zeros(self.resolution)
         rel_coords = np.true_divide(self.points, self.dims)*(self.resolution-1)
         rel_coords = np.rint(rel_coords).astype(int) # absolutely bizarre bug
 
         actual_indexes = np.ravel_multi_index(rel_coords.T, self.resolution)
-        if values is None:
-            values = self['source']
         _ndarray.flat[actual_indexes] = values.ravel()
         return _ndarray.squeeze()
 

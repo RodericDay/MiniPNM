@@ -21,16 +21,6 @@ def test_print():
     network = mini.Delaunay.random(100)
     print( network )
 
-def test_basic_cubic():
-    '''
-    this is actually wrong
-    '''
-    R = np.zeros([2,2,2])
-    network = mini.Cubic(R, R.shape)
-    expected = [    [0,0,0], [0,0,2], [0,2,0], [0,2,2],
-                    [2,0,0], [2,0,2], [2,2,0], [2,2,2], ]
-    assert np.allclose(expected, network.points)
-
 def test_prune():
     delaunay = mini.Delaunay(np.random.rand(100,3))
     original_size = delaunay.size
@@ -42,9 +32,9 @@ def test_prune():
 def test_rectilinear_integrity():
     R = np.random.rand(10,20,30)
     # prune the mini way
-    network = mini.Cubic(R)
-    network = network - (R.ravel()<= R.mean())
-    O = network.asarray()
+    network = mini.Cubic.from_source(R)
+    network = network - (R <= R.mean())
+    O = network.asarray(network['source'])
     # what it would look like normally
     M = np.where(R > R.mean(), R, 0)
     assert np.allclose(M, O)
@@ -52,15 +42,15 @@ def test_rectilinear_integrity():
 def test_rectilinear_integrity_2d():
     R = np.random.rand(15,30)
     # prune the mini way
-    network = mini.Cubic(R)
-    network = network - (R.ravel()<= R.mean())
-    O = network.asarray()
+    network = mini.Cubic.from_source(R)
+    network = network - (R <= R.mean())
+    O = network.asarray(network['source'])
     # what it would look like normally
     M = np.where(R > R.mean(), R, 0)
     assert np.allclose(M, O)
 
 def test_subtract_all():
-    network = mini.Cubic.empty([3,3,3])
+    network = mini.Cubic([3,3,3])
     reduced = network - np.ones(network.order).astype(bool)
     assert set(network.keys()) == set(reduced.keys())
     assert reduced.size == 0
@@ -106,7 +96,7 @@ def test_sphere_stuff():
     Z = np.sqrt(X**2 + Y**2)
     im = Z < Z.mean()
 
-    network = mini.Cubic(im, im.shape)
+    network = mini.Cubic.from_source(im)
     network = network - im
 
     centers, radii = mini.image.extract_spheres(im)

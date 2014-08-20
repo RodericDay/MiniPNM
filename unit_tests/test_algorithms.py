@@ -3,7 +3,7 @@ import minipnm as mini
 
 def test_linear_solver():
     R = mini.image.gaussian_noise([10, 10, 10])
-    network = mini.Cubic(R)
+    network = mini.Cubic.from_source(R)
     network = network - (R<np.percentile(R, 10))
     x,y,z = network.coords
     l = x == x.min()
@@ -16,7 +16,7 @@ def test_linear_solver():
     assert np.allclose(l_flux, r_flux)
 
 def test_invasion():
-    network = mini.Cubic.empty([20,20])
+    network = mini.Cubic([20,20])
     x,y,z = network.coords
     sol = mini.algorithms.invasion(network.adjacency_matrix, x==x.min(), x==x.max())
 
@@ -31,7 +31,7 @@ def test_shortest_path():
     matrix = np.matrix([[int(w) for w in row.split(' ') if w]
                        for row in string.strip().split('\n')])
     matrix = np.rot90(matrix, 3)
-    network = mini.Cubic(matrix)
+    network = mini.Cubic.from_source(matrix)
     cmat = network.adjacency_matrix
     cmat.data = matrix.A1[cmat.col]
     # some geometric definitions
@@ -53,3 +53,7 @@ def test_shortest_path():
     assert matrix.A1[path2].sum() == 994
     path3 = mini.algorithms.shortest_path(cmat, top_left, bottom_right)
     assert matrix.A1[path3].sum() == 2297
+
+if __name__ == '__main__':
+    import pytest
+    pytest.main(__file__)
