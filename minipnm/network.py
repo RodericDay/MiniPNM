@@ -88,21 +88,12 @@ class Network(dict):
         return len(self.pairs)
 
     @property
-    def dims(self):
-        '''
-        the `or 1` hack is somewhat ugly, but is a reasonable way to handle
-        unit-thin networks.
-        '''
-        w = self['x'].max() - self['x'].min() or 1
-        h = self['y'].max() - self['y'].min() or 1
-        t = self['z'].max() - self['z'].min() or 1
-        return np.array([w, h, t])
+    def bbox(self):
+        return self.points.max(axis=0) - self.points.min(axis=0)
 
     @property
     def centroid(self):
-        x,y,z = self.coords
-        w,h,t = self.dims
-        return np.array([w/2.+x.min(), h/2.+y.min(), t/2.+z.min()])
+        return self.points.min(axis=0) + self.bbox/2.
 
     @property
     def indexes(self):
@@ -288,7 +279,7 @@ class Cubic(Network):
         if spacing is not None:
             self.points *= spacing
         elif bbox is not None:
-            self.points = self.points * ( bbox / self.points.max(axis=0) )
+            self.points *= bbox / self.points.max(axis=0)
 
         I = np.arange(arr.size).reshape(arr.shape)
         tails, heads = [], []
@@ -303,18 +294,15 @@ class Cubic(Network):
             heads.extend(T.flat)
         self.pairs = np.vstack([tails, heads]).T
 
-    @property
-    def resolution(self):
-        return np.array([len(set(d)) for d in self.coords])
-
     def asarray(self, values):
-        _ndarray = np.zeros(self.resolution)
-        rel_coords = np.true_divide(self.points, self.dims)*(self.resolution-1)
-        rel_coords = np.rint(rel_coords).astype(int) # absolutely bizarre bug
-
-        actual_indexes = np.ravel_multi_index(rel_coords.T, self.resolution)
-        _ndarray.flat[actual_indexes] = values.ravel()
-        return _ndarray.squeeze()
+        spacing = map(np.diff, map(np.unique, self.coords))
+        min_spacing = [min(a) if len(a) else 1.0 for a in spacing]
+        points = (self.points / min_spacing).astype(int)
+        bbox = (self.bbox / min_spacing + 1).astype(int)
+        actual_indexes = np.ravel_multi_index(points.T, bbox)
+        array = np.zeros(bbox)
+        array.flat[actual_indexes] = values.ravel()
+        return array.squeeze()
 
 
 class Delaunay(Network):

@@ -3,8 +3,7 @@ import minipnm as mini
 
 output = 200.
 
-noise = mini.image.gaussian_noise([50,20])
-network = mini.Cubic(noise, noise.shape)
+network = mini.Cubic([50,20])
 
 # pts = np.random.rand(1000, 3)
 # pts.T[0] *= 50
