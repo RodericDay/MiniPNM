@@ -13,7 +13,7 @@ def poisson_disk_sampling(bbox, pdf, n_iter=100, p_max=10000):
     # subfunctions that use local namespace
     def outside():
         ''' checks if point center is within bounds '''
-        return any(abs(c) > d/2. for c,d in zip([xj,yj,zj], bbox))
+        return any(c < 0 or c > d for c,d in zip([xj,yj,zj], bbox))
 
     def near():
         ''' checks if distance between two centers larger than radii'''
@@ -31,6 +31,7 @@ def poisson_disk_sampling(bbox, pdf, n_iter=100, p_max=10000):
     radii = [next(pdf)]
     available = [0]
     is3d = True if len(bbox)==3 else False
+    e = 3. if is3d else 2.
     
     while available and len(points) <= p_max:
         r = float(next(pdf))
@@ -44,7 +45,7 @@ def poisson_disk_sampling(bbox, pdf, n_iter=100, p_max=10000):
             # try a random point in the sampling space
             aj = random.random() * 2 * math.pi
             bj = random.random() * 2 * math.pi if is3d else 0
-            rj = ( random.random()*(outer_r**3 - inner_r**3) + inner_r**3 )**(1./3.)
+            rj = ( random.random()*(outer_r**e - inner_r**e) + inner_r**e )**(1./e)
 
             xj = rj * math.cos(bj) * math.sin(aj) + xi
             yj = rj * math.cos(bj) * math.cos(aj) + yi
