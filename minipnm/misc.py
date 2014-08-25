@@ -6,6 +6,8 @@ from scipy import misc, ndimage, sparse
 '''
 misc houses scientific tools and helpers
 '''
+class distributions:
+    uniform = (1 for _ in iter(int,1))
 
 def mid(array):
     center = (array.max() - array.min())/2.

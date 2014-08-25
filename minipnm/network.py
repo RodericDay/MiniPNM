@@ -250,7 +250,8 @@ class Network(dict):
                     key,
                     value.dtype,
                     value.shape,))
-        return '<'+'\n\t'.join(entries)+'\nSize: {}>'.format(self.size)
+        return '<'+'\n\t'.join(entries)+\
+            '\nOrder: {self.order}, Size: {self.size}>'.format(**locals())
 
     def __add__(self, other):
         return self.merge(other, spacing=0, centering=True)
