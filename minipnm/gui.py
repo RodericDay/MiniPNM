@@ -10,7 +10,8 @@ try:
     from PyQt4 import QtGui, QtCore
     import pyqtgraph as QtGraph
 except ImportError:
-    QtGui = type("", (), {"QWidget": object, "QMainWindow": object})
+    QtGui = type("vtk, PyQt, or pyqtgraph missing. functionality unavailable!",
+                 (), {"QWidget": object, "QMainWindow": object})
 
 
 class Canvas(QtGui.QWidget):

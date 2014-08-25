@@ -7,7 +7,8 @@ from matplotlib import cm
 try:
     import vtk
 except ImportError:
-    vtk = type("", (), {'vtkActor': object})
+    vtk = type("vtk module missing. functionality unavailable!",
+               (), {'vtkActor': object})
 
 class Actor(vtk.vtkActor):
 
