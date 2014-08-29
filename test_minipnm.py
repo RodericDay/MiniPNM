@@ -31,11 +31,13 @@ def test_prune():
 
 def test_subtract_all():
     network = mini.Cubic([3,3,3])
-    reduced = network - np.ones(network.order).astype(bool)
+    reduced = network.copy()
+    reduced.prune(network.indexes!=-1)
     assert set(network.keys()) == set(reduced.keys())
     assert reduced.size == 0
-    assert all(value.size==0 for value in reduced.values())
-    rereduced = reduced - np.ones(reduced.order).astype(bool)
+    assert all([value.size==0 for value in reduced.values()])
+    rereduced = reduced.copy()
+    rereduced.prune(network.indexes!=-1)
     assert set(network.keys()) == set(rereduced.keys())
     assert rereduced.size == 0
     assert all(value.size==0 for value in rereduced.values())
