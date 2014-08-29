@@ -15,37 +15,41 @@ from . import utils
 from . import geometry
 from . import graphics
 
-''' Subclassing rules
-
-    A "network" as defined by MiniPNM is essentially a graph and a coordinate
-    array coupled together.
-
-    __init__ must *somehow* append coordinate (x,y,z) and connectivity (heads & tails)
-    arrays to the network. that's its role. you can add many other attributes if
-    you so wish, but you MUST provide those two. the `points` and
-    `pairs` property setters are offered for convenience
-
-    The other main rule is that aside from methods and properties, these objects
-    should essentially be *just* dictionaries. One way to think about this is that
-    the answer to the question "will I miss any data if I just write down the
-    results of network.items?" should be NO.
-
-    Convenience methods that automate some work (ie. import an image from a file)
-    can be found in the `misc` module
-
-    When in doubt: http://en.wikipedia.org/wiki/Glossary_of_graph_theory
-'''
-
 
 class Network(dict):
+    '''
+    A network as defined by MiniPNM is essentially a graph and a coordinate
+    array coupled together.
+
+    __init__ must *somehow* append coordinate (x,y,z) and connectivity (tails &
+    heads) arrays to the network. Other attributes may be added if required,
+    but the aforementioned 5 are mandatory. They are packaged into properties
+    for convenience.
+
+    As a general rule, aside from methods and properties, these objects
+    should essentially be *just* dictionaries. In order to save the data and
+    recover it later, it should suffice to call `network.items()` and write
+    the output to a file.
+
+    Lastly, for the sake of communicability, there is a reference of choice for 
+    terminology:
+    http://en.wikipedia.org/wiki/Glossary_of_graph_theory
+    '''
+    points = utils.property_from(['x','y','z'])
+    pairs = utils.property_from(['tails','heads'], dtype=int, default=[])
     filename = None
 
     @property
-    def coords(self):
-        return np.vstack([self['x'], self['y'], self['z']])
+    def order(self):
+        return len(self.points)
 
-    points = utils.property_from(['x','y','z'])
-    pairs = utils.property_from(['tails','heads'], dtype=int, default=[])
+    @property
+    def size(self):
+        return len(self.pairs)
+
+    @property
+    def coords(self):
+        return self.points.T
 
     @property
     def midpoints(self):
@@ -78,14 +82,6 @@ class Network(dict):
     @property
     def clusters(self):
         return sparse.csgraph.connected_components(self.adjacency_matrix)[0]
-
-    @property
-    def order(self):
-        return len(self.points)
-
-    @property
-    def size(self):
-        return len(self.pairs)
 
     @property
     def bbox(self):
@@ -357,9 +353,16 @@ class Bridson(Network):
     Delaunay to generate throats,
     Some basic transformations to ensure geometric coherence,
     '''
-    def __init__(self, bbox=[10,10,10], pdf=(1 for _ in itertools.count())):
-        points, radii = poisson_disk_sampling(bbox, pdf)
-        self.points, self['sphere_radii'] = np.array(points), np.array(radii)
+    spans = utils.property_from(['cylinder_length_x','cylinder_length_y','cylinder_length_z'])
+    midpoints = utils.property_from(['cylinder_center_x','cylinder_center_y','cylinder_center_z'])
+
+    @classmethod
+    def pds(cls, bbox=[10,10,10], pdf=(1 for _ in itertools.count())):
+        centers, radii = poisson_disk_sampling(bbox, pdf)
+        return cls(centers, radii)
+
+    def __init__(self, centers, radii):
+        self.points, self['sphere_radii'] = np.array(centers), np.array(radii)
         self.pairs = Delaunay.edges_from_points(self.points)
         self['cylinder_radii'] = self['sphere_radii'][self.pairs].min(axis=1)/4.
         self.spans, self.midpoints = geometry.cylinders(self.points, self['sphere_radii'], self.pairs)
@@ -374,8 +377,6 @@ class Bridson(Network):
             self.spans = self.spans[safe]
             self['cylinder_radii'] = self['cylinder_radii'][safe]
 
-    spans = utils.property_from(['cylinder_length_x','cylinder_length_y','cylinder_length_z'])
-    midpoints = utils.property_from(['cylinder_center_x','cylinder_center_y','cylinder_center_z'])
 
     def actors(self, saturation_history=None):
         shells = graphics.Spheres(self.points, self['sphere_radii'], color=(1,1,1), alpha=0.4)
