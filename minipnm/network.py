@@ -64,7 +64,7 @@ class Network(dict):
     @property
     def adjacency_matrix(self):
         tails, heads = self.pairs.T
-        ijk = np.ones_like(tails), (tails, heads)
+        ijk = np.ones_like(tails), (heads, tails)
         return sparse.coo_matrix(ijk, shape=(self.order, self.order))
 
     @property
