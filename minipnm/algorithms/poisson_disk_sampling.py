@@ -1,6 +1,44 @@
 import random, math
+import numpy as np
 
-def poisson_disk_sampling(bbox, pdf, n_iter=30, p_max=10000):
+def inside(point, bbox):
+    return all(c>0 and c<d for c, d in zip(point, bbox))
+
+def get_nearby_indexes(grid, gcoords, scope=None):
+    if scope is None:
+        scope = len(gcoords) + 1
+    slcobj = [slice(max(0, c-scope+1), c+scope) for c in gcoords]
+    return set(grid[slcobj].flat) - {-1}
+
+def get_nearby_discs(disc_list, sampled):
+    for other in disc_list:
+        rsum = other[-1] + sampled[-1]
+        if any(abs(a-b) > rsum for a,b in zip(other[:-1], sampled[:-1])):
+            continue
+        yield other
+
+def intersecting(neighbor_list, sampled):
+    for neighbor in neighbor_list:
+        rsum = (neighbor[-1] + sampled[-1])**2
+        dist = sum((a-b)**2 for a, b in zip(neighbor[:-1], sampled[:-1]))
+        yield rsum > dist
+
+def sample_around(disk, r, d=2):
+    x0, y0, z0, r0 = disk
+    rmin = r0 + r
+    rmax = r0 + 2 * r
+
+    angle_xy = random.random() * 2 * math.pi
+    angle_z = random.random() * 2 * math.pi if d==3 else 0
+    dist = ( random.random()*(rmax**d - rmin**d) + rmin**d ) ** (1./d)
+
+    x = x0 + dist * math.sin(angle_xy) * math.cos(angle_z)
+    y = y0 + dist * math.cos(angle_xy) * math.cos(angle_z)
+    z = z0 + dist * math.sin(angle_z)
+
+    return x, y, z, r
+
+def poisson_disk_sampling(bbox, r, n_iter=30, p_max=10000):
     '''
     A 3D version of Robert Bridson's algorithm, perhaps best illustrated by
     Mike Bostock's following D3.js animation:
@@ -10,55 +48,33 @@ def poisson_disk_sampling(bbox, pdf, n_iter=30, p_max=10000):
     and purports to pack the space as tightly and randomly as possible,
     outputting the coordinates and radii of the corresponding circles.
     '''
-    # subfunctions that use local namespace
-    def outside():
-        ''' checks if point center is within bounds '''
-        return any(c < 0 or c > d for c,d in zip([xj,yj,zj], bbox))
+    cell_size = r / math.sqrt(len(bbox))
+    grid = np.zeros([d//cell_size+1 for d in bbox], dtype=int) - 1
+    gcoords = lambda xyz: tuple(c//cell_size for c in xyz[:len(bbox)])
 
-    def near():
-        ''' checks if distance between two centers larger than radii'''
-        for (xk, yk, zk), rk in zip(points, radii):
-            radii_sum = r + rk
-            # manhattan distance filter for distant points
-            dist_mhtn = [abs(xj-xk), abs(yj-yk), abs(zj-zk)]
-            if any(dm > radii_sum for dm in dist_mhtn):
-                yield False
-            else:
-                dist_btwn = math.sqrt(sum(d**2 for d in dist_mhtn))
-                yield radii_sum > dist_btwn
-
-    points = [(0,0,0)]
-    radii = [next(pdf)]
+    disc_list = [(0,0,0,r)]
+    grid[gcoords(disc_list[0][:-1])] = 0
     available = [0]
-    is3d = True if len(bbox)==3 else False
-    e = 3. if is3d else 2.
-    
-    while available and len(points) <= p_max:
-        r = float(next(pdf))
-        source = i = random.choice(available)
-        xi, yi, zi = points[i]
-        inner_r = min_dist = radii[i] + r
-        outer_r = min_dist * 2
 
+    while available and len(disc_list) < p_max:
+        i = random.choice(available)
+        origin = disc_list[i]
 
         for j in range(n_iter):
-            # try a random point in the sampling space
-            aj = random.random() * 2 * math.pi
-            bj = random.random() * 2 * math.pi if is3d else 0
-            rj = ( random.random()*(outer_r**e - inner_r**e) + inner_r**e )**(1./e)
-
-            xj = rj * math.cos(bj) * math.sin(aj) + xi
-            yj = rj * math.cos(bj) * math.cos(aj) + yi
-            zj = rj * math.sin(bj) + zi
-
-            # bail of checks fail
-            if outside() or any(near()):
+            sampled = sample_around(origin, r, d=len(bbox))
+            if not inside(sampled, bbox):
                 continue
-    
+
+            # neighbor_list = get_nearby_discs(disc_list, sampled)
+            neighbor_list = (disc_list[i] for i in get_nearby_indexes(grid, gcoords(sampled)))
+            if any(intersecting(neighbor_list, sampled)):
+                continue
+
             # if we got here the point is valid!
-            available.append( len(points) )
-            points.append( (xj, yj, zj) )
-            radii.append( r )
+            new_index = len(disc_list)
+            available.append( new_index )
+            grid[gcoords(sampled)] = new_index
+            disc_list.append( sampled )
             break
             
         else:
@@ -68,4 +84,5 @@ def poisson_disk_sampling(bbox, pdf, n_iter=30, p_max=10000):
             # neighbors, so we stop considering it
             available.remove(i)
 
-    return points, radii
+    x,y,z,r = zip(*disc_list)
+    return zip(x,y,z), r
