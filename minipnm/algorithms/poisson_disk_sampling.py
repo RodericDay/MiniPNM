@@ -1,6 +1,6 @@
 import random, math
 
-def poisson_disk_sampling(bbox, pdf, n_iter=100, p_max=10000):
+def poisson_disk_sampling(bbox, pdf, n_iter=30, p_max=10000):
     '''
     A 3D version of Robert Bridson's algorithm, perhaps best illustrated by
     Mike Bostock's following D3.js animation:

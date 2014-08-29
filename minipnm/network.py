@@ -198,7 +198,7 @@ class Network(dict):
             valid = (np.bincount(tails)[tails]==1) & (np.bincount(heads)[heads]==1)
             return tails[valid], heads[valid]
 
-    def prune(self, inaccessible, remove_pores=False):
+    def prune(self, inaccessible, remove_pores=True):
         accessible = self.indexes[~inaccessible.flatten()]
         good_heads = np.in1d(self['heads'], accessible)
         good_tails = np.in1d(self['tails'], accessible)
@@ -261,7 +261,7 @@ class Network(dict):
 
     def __sub__(self, inaccessible):
         new = self.copy()
-        new.prune(inaccessible, remove_pores=True)
+        new.prune(inaccessible, remove_pores=False)
         return new
 
 
