@@ -27,6 +27,10 @@ def laplacian(A):
     D = sparse.diags(A.sum(axis=1).A1, 0)
     return D - A
 
+def flux(adj, values):
+    adj.data = abs(values[adj.col] - values[adj.row])
+    return adj.mean(axis=1).A1
+
 def distances_to_neighbors(network):
     output = [[] for i in range(network.order)]
     for (t,h), d in zip(network.pairs, network.lengths):
