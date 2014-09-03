@@ -6,12 +6,12 @@ def inside(point, bbox):
 
 def get_nearby_indexes(grid, gcoords, scope=None):
     if scope is None:
-        scope = len(gcoords) + 1
+        scope = len(gcoords) + 2
     slcobj = [slice(max(0, c-scope+1), c+scope) for c in gcoords]
     return set(grid[slcobj].flat) - {-1}
 
-def get_nearby_discs(disc_list, sampled):
-    for other in disc_list:
+def get_nearby_discs(disk_list, sampled):
+    for other in disk_list:
         rsum = other[-1] + sampled[-1]
         if any(abs(a-b) > rsum for a,b in zip(other[:-1], sampled[:-1])):
             continue
@@ -52,29 +52,29 @@ def poisson_disk_sampling(bbox, r, n_iter=30, p_max=10000):
     grid = np.zeros([d//cell_size+1 for d in bbox], dtype=int) - 1
     gcoords = lambda xyz: tuple(c//cell_size for c in xyz[:len(bbox)])
 
-    disc_list = [(0,0,0,r)]
-    grid[gcoords(disc_list[0][:-1])] = 0
+    disk_list = [(0,0,0,r)]
+    grid[gcoords(disk_list[0][:-1])] = 0
     available = [0]
 
-    while available and len(disc_list) < p_max:
+    while available and len(disk_list) < p_max:
         i = random.choice(available)
-        origin = disc_list[i]
+        origin = disk_list[i]
 
         for j in range(n_iter):
             sampled = sample_around(origin, r, d=len(bbox))
             if not inside(sampled, bbox):
                 continue
 
-            # neighbor_list = get_nearby_discs(disc_list, sampled)
-            neighbor_list = (disc_list[i] for i in get_nearby_indexes(grid, gcoords(sampled)))
+            # neighbor_list = get_nearby_discs(disk_list, sampled)
+            neighbor_list = (disk_list[i] for i in get_nearby_indexes(grid, gcoords(sampled)))
             if any(intersecting(neighbor_list, sampled)):
                 continue
 
             # if we got here the point is valid!
-            new_index = len(disc_list)
+            new_index = len(disk_list)
             available.append( new_index )
             grid[gcoords(sampled)] = new_index
-            disc_list.append( sampled )
+            disk_list.append( sampled )
             break
             
         else:
@@ -84,5 +84,5 @@ def poisson_disk_sampling(bbox, r, n_iter=30, p_max=10000):
             # neighbors, so we stop considering it
             available.remove(i)
 
-    x,y,z,r = zip(*disc_list)
+    x,y,z,r = zip(*disk_list)
     return zip(x,y,z), r

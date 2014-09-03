@@ -93,10 +93,6 @@ def test_lengths():
     for i in [i for i, c in np.ndenumerate(im) if np.linalg.norm(np.subtract(i, N/2-0.5))>N/2.5]:
         im[i] = 0
 
-def test_bridson():
-    pdf = (np.random.normal(3) if i%3!=2 else np.random.normal(8) for i in it.count())
-    network = mini.Bridson.pds([30,30,10], pdf)
-
 
 if __name__ == '__main__':
     errors = pytest.main()

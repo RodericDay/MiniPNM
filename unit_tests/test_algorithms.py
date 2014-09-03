@@ -1,3 +1,4 @@
+import itertools as it
 import numpy as np
 import minipnm as mini
 
@@ -53,6 +54,16 @@ def test_shortest_path():
     assert matrix.A1[path2].sum() == 994
     path3 = mini.algorithms.shortest_path(cmat, top_left, bottom_right)
     assert matrix.A1[path3].sum() == 2297
+
+def test_poisson_disk_sampling():
+    xyz, r = mini.algorithms.poisson_disk_sampling([10,10], 1)
+    # no colliding spheres
+    collisions = []
+    for i,j in it.combinations(range(len(r)), 2):
+        r2 = ( r[i] + r[j] )**2
+        d2 = sum( (p1-p2)**2 for p1, p2 in zip(xyz[i], xyz[j]) )
+        if r2 > d2: collisions.append((i,j))
+    assert len(collisions) == 0
 
 if __name__ == '__main__':
     import pytest
