@@ -211,10 +211,19 @@ class Scene(object):
             camera = vtk.vtkInteractorStyleTrackballCamera()
             self.iren.SetInteractorStyle(camera)
 
-    def update_all(self, object=None, event=None, t=None):
-        if t is None:   t = next(self.ticks)
+    def __iter__(self):
         for aid in range(self.ren.VisibleActorCount()):
             actor = self.ren.GetActors().GetItemAsObject(aid)
+            yield actor
+
+    def __len__(self):
+        return min(actor.polydata.
+                   GetPointData().GetScalars().GetNumberOfTuples()
+                   for actor in self)
+
+    def update_all(self, object=None, event=None, t=None):
+        if t is None:   t = next(self.ticks)
+        for actor in self:
             actor.update(t)
         self.renWin.Render()
 
