@@ -38,7 +38,7 @@ def sample_around(disk, r, d=2):
 
     return x, y, z, r
 
-def poisson_disk_sampling(r=1, bbox=[10,10,10], attempts=30, limit=10000):
+def poisson_disk_sampling(r=1, bbox=[10,10], attempts=30, limit=10000):
     '''
     A 3D version of Robert Bridson's algorithm, perhaps best illustrated by
     Mike Bostock's following D3.js animation:

@@ -106,7 +106,9 @@ class Network(dict):
 
     def render(self, *args, **kwargs):
         wait = True
-        if 'scene' not in kwargs:
+        if 'scene' in kwargs:
+            scene = kwargs.pop('scene')
+        else:
             scene = graphics.Scene()
             wait = False
 
