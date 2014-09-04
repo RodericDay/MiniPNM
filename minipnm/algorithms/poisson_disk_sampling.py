@@ -48,17 +48,26 @@ def poisson_disk_sampling(r=1, bbox=[10,10,10], attempts=30, limit=10000):
     and purports to pack the space as tightly while still maintaining
     blue noise properties.
     
+    r may be the constant value of radii, or a generator.
     Outputs the coordinates and radii of the corresponding disks.
     '''
     is3d = len(bbox)==3
     bbox = tuple(bbox) if is3d else tuple(bbox)+(0,)
-    
-    cell_size = r / math.sqrt(3 if is3d else 2)
+
+    try:
+        next(r)
+        g = r
+    except TypeError:
+        g = (r for _ in iter(int,1))
+
+    sampling = [next(g) for _ in range(100)]
+    rmin, rmax = min(sampling), max(sampling)
+    cell_size = rmin / math.sqrt(3 if is3d else 2)
     grid = np.zeros([d//cell_size+1 for d in bbox], dtype=int) - 1
     # function to turn xyz coords to ijk
     ijk = lambda xyz: tuple(c//cell_size for c in xyz[:3 if is3d else 2])
 
-    disk_list = [tuple(random.random()*d for d in bbox)+(r,)]
+    disk_list = [tuple(random.random()*d for d in bbox)+(next(r),)]
     grid[ijk(disk_list[0][:-1])] = 0
     available = [0]
 
@@ -67,12 +76,14 @@ def poisson_disk_sampling(r=1, bbox=[10,10,10], attempts=30, limit=10000):
         origin = disk_list[i]
 
         for j in range(attempts):
-            sampled = sample_around(origin, r, d=3 if is3d else 2)
+            sampled = sample_around(origin, next(g), d=3 if is3d else 2)
             if not inside(sampled, bbox):
                 continue
 
             # neighbor_list = get_nearby_discs(disk_list, sampled)
-            neighbor_list = (disk_list[i] for i in get_nearby_indexes(grid, ijk(sampled)))
+            neighbor_list = (disk_list[i] for i in \
+                get_nearby_indexes(grid, ijk(sampled),
+                np.ceil((rmax+sampled[-1])/cell_size)))
             if any(intersecting(neighbor_list, sampled)):
                 continue
 
