@@ -83,7 +83,11 @@ class GUI(QtGui.QMainWindow):
         self.setCorner(QtCore.Qt.BottomLeftCorner, QtCore.Qt.LeftDockWidgetArea)
         self.toolBar.addAction(self.treeDockWidget.toggleViewAction())
 
-    def plotXY(self, x, y):
+    def plot(self, a1, a2=None):
+        if a2 is None:
+            x, y = np.arange(len(a1)), a1
+        else:
+            x, y = a1, a2
         self.plotWidget.clear()
         self.plotWidget.plot(x,y, symbol='o')
         self.timeLine = QtGraph.InfiniteLine(angle=90, movable=True)
@@ -97,6 +101,9 @@ class GUI(QtGui.QMainWindow):
         self.scene.update_all(t=t)
 
     def run(self):
+        if len(self.plotWidget.plotItem.listDataItems())==0:
+            fs = len(self.scene)
+            self.plot(np.arange(fs), np.ones(fs))
         self.show()
         self.scene.iren.Initialize()
         self.app.exec_()
