@@ -2,7 +2,7 @@ import random, math
 import numpy as np
 
 def inside(point, bbox):
-    return all(c>0 and c<d for c, d in zip(point, bbox))
+    return all(c>=0 and c<=d for c, d in zip(point, bbox))
 
 def get_nearby_indexes(grid, gcoords, scope=None):
     if scope is None:
@@ -38,42 +38,48 @@ def sample_around(disk, r, d=2):
 
     return x, y, z, r
 
-def poisson_disk_sampling(bbox, r, n_iter=30, p_max=10000):
+def poisson_disk_sampling(r=1, bbox=[10,10,10], attempts=30, limit=10000):
     '''
     A 3D version of Robert Bridson's algorithm, perhaps best illustrated by
     Mike Bostock's following D3.js animation:
     http://bl.ocks.org/mbostock/dbb02448b0f93e4c82c3
 
     Takes in a virtual 'bounding box' and a generator from which to sample,
-    and purports to pack the space as tightly and randomly as possible,
-    outputting the coordinates and radii of the corresponding circles.
+    and purports to pack the space as tightly while still maintaining
+    blue noise properties.
+    
+    Outputs the coordinates and radii of the corresponding disks.
     '''
-    cell_size = r / math.sqrt(len(bbox))
+    is3d = len(bbox)==3
+    bbox = tuple(bbox) if is3d else tuple(bbox)+(0,)
+    
+    cell_size = r / math.sqrt(3 if is3d else 2)
     grid = np.zeros([d//cell_size+1 for d in bbox], dtype=int) - 1
-    gcoords = lambda xyz: tuple(c//cell_size for c in xyz[:len(bbox)])
+    # function to turn xyz coords to ijk
+    ijk = lambda xyz: tuple(c//cell_size for c in xyz[:3 if is3d else 2])
 
-    disk_list = [(0,0,0,r)]
-    grid[gcoords(disk_list[0][:-1])] = 0
+    disk_list = [tuple(random.random()*d for d in bbox)+(r,)]
+    grid[ijk(disk_list[0][:-1])] = 0
     available = [0]
 
-    while available and len(disk_list) < p_max:
+    while available and len(disk_list) < limit:
         i = random.choice(available)
         origin = disk_list[i]
 
-        for j in range(n_iter):
-            sampled = sample_around(origin, r, d=len(bbox))
+        for j in range(attempts):
+            sampled = sample_around(origin, r, d=3 if is3d else 2)
             if not inside(sampled, bbox):
                 continue
 
             # neighbor_list = get_nearby_discs(disk_list, sampled)
-            neighbor_list = (disk_list[i] for i in get_nearby_indexes(grid, gcoords(sampled)))
+            neighbor_list = (disk_list[i] for i in get_nearby_indexes(grid, ijk(sampled)))
             if any(intersecting(neighbor_list, sampled)):
                 continue
 
             # if we got here the point is valid!
             new_index = len(disk_list)
             available.append( new_index )
-            grid[gcoords(sampled)] = new_index
+            grid[ijk(sampled)] = new_index
             disk_list.append( sampled )
             break
             
