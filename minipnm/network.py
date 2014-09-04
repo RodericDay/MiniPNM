@@ -104,9 +104,9 @@ class Network(dict):
         minipnm.save_vtp(self, filename)
         self.filename = filename
 
-    def render(self, scene=None, *args, **kwargs):
+    def render(self, *args, **kwargs):
         wait = True
-        if scene is None:
+        if 'scene' not in kwargs:
             scene = graphics.Scene()
             wait = False
 
@@ -344,39 +344,38 @@ class PackedSpheres(Network):
             self.pairs = np.array(pairs)
 
 
-class Bridson(Network):
+class Radial(Network):
     '''
-    A tightly packed network of spheres and cylinders following a given
-    distribution
+    Takes in points, sphere radii, and returns a fleshed out network consisting
+    of spheres and cylinders.
 
-    Poisson disc sampling to generate points,
-    Delaunay to generate throats,
-    Some basic transformations to ensure geometric coherence,
+    If connectivity pairs aren't specified, default is Delaunay tessellation.
+    Pruning follows to ensure there are no collisions regardless.
     '''
     spans = utils.property_from(['cylinder_length_x','cylinder_length_y','cylinder_length_z'])
     midpoints = utils.property_from(['cylinder_center_x','cylinder_center_y','cylinder_center_z'])
 
-    @classmethod
-    def pds(cls, bbox=[10,10,10], pdf=(1 for _ in itertools.count())):
-        centers, radii = poisson_disk_sampling(bbox, pdf)
-        return cls(centers, radii)
+    def __init__(self, centers, radii, pairs=None):
+        self.points = np.array(centers)
+        if pairs is None:
+            pairs = Delaunay.edges_from_points(self.points)
+        self.pairs = np.array(pairs)
 
-    def __init__(self, centers, radii):
-        self.points, self['sphere_radii'] = np.array(centers), np.array(radii)
-        self.pairs = Delaunay.edges_from_points(self.points)
+        self['sphere_radii'] = np.array(radii)
         self['cylinder_radii'] = self['sphere_radii'][self.pairs].min(axis=1)/4.
         self.spans, self.midpoints = geometry.cylinders(self.points, self['sphere_radii'], self.pairs)
+        self.prune_colliding()
 
+    def prune_colliding(self):
         for center, radius in zip(self.points, self['sphere_radii']):
             safe = ~geometry.intersecting(center, radius,
-                                 self.spans, self.midpoints, self['cylinder_radii'])
+                        self.spans, self.midpoints, self['cylinder_radii'])
 
             # deletes and stuff
             self.pairs = self.pairs[safe]
             self.midpoints = self.midpoints[safe]
             self.spans = self.spans[safe]
             self['cylinder_radii'] = self['cylinder_radii'][safe]
-
 
     def actors(self, saturation_history=None):
         shells = graphics.Spheres(self.points, self['sphere_radii'], color=(1,1,1), alpha=0.4)
@@ -386,7 +385,6 @@ class Bridson(Network):
 
         history = graphics.Spheres(self.points, self['sphere_radii']*saturation_history*0.99, color=(0,0,1))
         return [shells, tubes, history]
-
 
 
 class Voronoi(Network):
