@@ -209,12 +209,14 @@ class Scene(object):
 
         if fix_camera:
             camera = vtk.vtkInteractorStyleTrackballCamera()
+            camera.SetCurrentRenderer(self.ren)
             self.iren.SetInteractorStyle(camera)
 
     def __iter__(self):
         for aid in range(self.ren.VisibleActorCount()):
             actor = self.ren.GetActors().GetItemAsObject(aid)
-            yield actor
+            if hasattr(actor, 'update'):
+                yield actor
 
     def __len__(self):
         return min(actor.polydata.
