@@ -67,7 +67,7 @@ def poisson_disk_sampling(r=1, bbox=[10,10], attempts=30, limit=10000):
     # function to turn xyz coords to ijk
     ijk = lambda xyz: tuple(c//cell_size for c in xyz[:3 if is3d else 2])
 
-    disk_list = [tuple(random.random()*d for d in bbox)+(next(r),)]
+    disk_list = [tuple(random.random()*d for d in bbox)+(next(g),)]
     grid[ijk(disk_list[0][:-1])] = 0
     available = [0]
 
@@ -83,7 +83,7 @@ def poisson_disk_sampling(r=1, bbox=[10,10], attempts=30, limit=10000):
             # neighbor_list = get_nearby_discs(disk_list, sampled)
             neighbor_list = (disk_list[i] for i in \
                 get_nearby_indexes(grid, ijk(sampled),
-                np.ceil((rmax+sampled[-1])/cell_size)))
+                np.ceil((rmax+sampled[-1])/cell_size)+1))
             if any(intersecting(neighbor_list, sampled)):
                 continue
 
