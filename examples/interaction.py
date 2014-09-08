@@ -1,50 +1,60 @@
-import vtk
+import random
+from vtk import *
 import minipnm as mini
 
-'''
-Keypress j / Keypress t: toggle between joystick (position sensitive) and trackball (motion sensitive) styles. In joystick style, motion occurs continuously as long as a mouse button is pressed. In trackball style, motion occurs when the mouse button is pressed and the mouse pointer moves.
-Keypress c / Keypress a: toggle between camera and actor modes. In camera mode, mouse events affect the camera position and focal point. In actor mode, mouse events affect the actor that is under the mouse pointer.
-Button 1: rotate the camera around its focal point (if camera mode) or rotate the actor around its origin (if actor mode). The rotation is in the direction defined from the center of the renderer's viewport towards the mouse position. In joystick mode, the magnitude of the rotation is determined by the distance the mouse is from the center of the render window.
-Button 2: pan the camera (if camera mode) or translate the actor (if actor mode). In joystick mode, the direction of pan or translation is from the center of the viewport towards the mouse position. In trackball mode, the direction of motion is the direction the mouse moves. (Note: with 2-button mice, pan is defined as <Shift>-Button 1.)
-Button 3: zoom the camera (if camera mode) or scale the actor (if actor mode). Zoom in/increase scale if the mouse position is in the top half of the viewport; zoom out/decrease scale if the mouse position is in the bottom half. In joystick mode, the amount of zoom is controlled by the distance of the mouse pointer from the horizontal centerline of the window.
-Keypress 3: toggle the render window into and out of stereo mode. By default, red-blue stereo pairs are created. Some systems support Crystal Eyes LCD stereo glasses; you have to invoke SetStereoTypeToCrystalEyes() on the rendering window.
-Keypress e: exit the application.
-Keypress f: fly to the picked point
-Keypress p: perform a pick operation. The render window interactor has an internal instance of vtkCellPicker that it uses to pick.
-Keypress r: reset the camera view along the current view direction. Centers the actors and moves the camera so that all actors are visible.
-Keypress s: modify the representation of all actors so that they are surfaces.
-Keypress u: invoke the user-defined function. Typically, this keypress will bring up an interactor that you can type commands in. Typing u calls UserCallBack() on the vtkRenderWindowInteractor, which invokes a vtkCommand::UserEvent. In other words, to define a user-defined callback, just add an observer to the vtkCommand::UserEvent on the vtkRenderWindowInteractor object.
-Keypress w: modify the representation of all actors so that they are wireframe.
-'''
+# some source stuff
+g = (1 for i in xrange(100000))
+c, r = mini.algorithms.poisson_disk_sampling(r=g, bbox=[10,10,10])
 
-network = mini.Radial(*mini.algorithms.poisson_disk_sampling(limit=3))
-spheres, tubes = network.actors()
+network = mini.Radial(c, r)
+adj = network.adjacency_matrix
+shells, tubes = network.actors()
+contents = mini.graphics.Spheres(c, [0 for _ in r], color=(0,0,1))
+glyph3D = contents.glyph3D
+polydata = contents.polydata
+scalars = polydata.GetPointData().GetScalars()
 
-def handleIt(obj, event):
-    ''' i need the id '''
-    actor = picker.GetActor()
-    if actor is None:
-        exit()
-    # print dir(picker), '\n'
-    print actor.mapper, '\n'
-    print str(picker).replace('\n',' ||')
-    print picker.GetSelectionPoint(), repr(actor)
+ren = vtkRenderer()
+ren.AddActor(shells)
+ren.AddActor(tubes)
+ren.AddActor(contents)
 
-scene = mini.Scene()
-picker = vtk.vtkCellPicker()
+renWin = vtkRenderWindow()
+renWin.AddRenderer(ren)
 
-scene.iren.SetPicker(picker)
-scene.add_actors([spheres, tubes])
-scene.ren.ResetCamera()
-scene.iren.Initialize()
+def add_bucket(i, amt=0.1):
+    neighbors = adj.row[adj.col==i]
+    f = [scalars.GetValue(j)/2. for j in range(len(r))]
+    f[i] += amt
+    surplus = max(0, f[i] - r[i])
+    f[i] = min(r[i], f[i])
+    [scalars.SetValue(j, f[j]*2.) for j in range(len(r))]
+    polydata.Modified()
 
-labelMapper = vtk.vtkLabeledDataMapper()
-labelMapper.SetInput(spheres.polydata)
-labelActor = vtk.vtkActor2D()
-labelActor.SetMapper(labelMapper)
-scene.add_actors([labelActor])
+    if all(a==b for a,b in zip(r,f)):
+        print 'full!'
+        return
 
-picker.AddObserver("EndPickEvent", handleIt)
-picker.Pick(141.0, 132.0, 0.0, scene.ren)
+    if surplus:
+        add_bucket(random.choice(neighbors), surplus)
 
-scene.play()
+def handlePick(obj, event):
+    ''' get the id of the source point '''
+    if not picker.GetActor() is shells:
+        return
+    
+    pointIds = glyph3D.GetOutput().GetPointData().GetArray("InputPointIds")
+    selectedId = int(pointIds.GetTuple1(picker.GetPointId()))
+
+    add_bucket(selectedId)
+    
+    renWin.Render()
+
+picker = vtkCellPicker()
+picker.AddObserver("EndPickEvent", handlePick)
+
+iren = vtkRenderWindowInteractor()
+iren.SetRenderWindow(renWin)
+iren.GetInteractorStyle().SetCurrentRenderer(ren)
+iren.SetPicker(picker)
+iren.Start()
