@@ -258,6 +258,12 @@ class Scene(object):
         self.update_all()
         self.iren.Start()
 
-    def add_actors(self, list_of_actors):
+    def add_actors(self, list_of_actors, label=False):
         for actor in list_of_actors:
             self.ren.AddActor(actor)
+            if label:
+                labelMapper = vtk.vtkLabeledDataMapper()
+                labelMapper.SetInput(actor.polydata)
+                labelActor = vtk.vtkActor2D()
+                labelActor.SetMapper(labelMapper)
+                self.ren.AddActor(labelActor)
