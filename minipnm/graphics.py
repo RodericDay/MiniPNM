@@ -158,19 +158,20 @@ class Tubes(Actor):
 class Spheres(Actor):
 
     def __init__(self, centers, radii, alpha=1, color=(1,1,1)):
+        self.radii = np.atleast_2d(radii)
         self.polydata = vtk.vtkPolyData()
         self.polydata.SetPoints(self.pointArray(centers))
-        self.radii = np.atleast_2d(radii)
         self.update()
 
-        self.sphere_source = vtk.vtkSphereSource()
-        self.glypher = vtk.vtkProgrammableGlyphFilter()
-        self.glypher.SetInput(self.polydata)
-        self.glypher.SetSource(self.sphere_source.GetOutput())
-        self.glypher.SetGlyphMethod(self.glyph_method)
+        self.source = vtk.vtkSphereSource()
+        self.glyph3D = vtk.vtkGlyph3D()
+        self.glyph3D.SetSourceConnection(self.source.GetOutputPort())
+        self.glyph3D.SetInput(self.polydata)
+        self.glyph3D.GeneratePointIdsOn()
+        self.glyph3D.Update()
 
         self.mapper = vtk.vtkPolyDataMapper()
-        self.mapper.SetInputConnection(self.glypher.GetOutputPort())
+        self.mapper.SetInputConnection(self.glyph3D.GetOutputPort())
         self.SetMapper(self.mapper)
 
         self.GetProperty().SetOpacity(alpha)
@@ -178,15 +179,10 @@ class Spheres(Actor):
         self.mapper.SetScalarVisibility(False)
         self.GetProperty().SetColor(r,g,b)
 
-    def glyph_method(self):
-        pid = self.glypher.GetPointId()
-        self.sphere_source.SetCenter(self.glypher.GetPoint())
-        radius = self.glypher.GetPointData().GetScalars().GetValue(pid)
-        self.sphere_source.SetRadius(radius)
-
     def update(self, t=0):
         i = t % len(self.radii)
-        self.polydata.GetPointData().SetScalars(self.floatArray(self.radii[i]))
+        d = 2*self.radii[i]
+        self.polydata.GetPointData().SetScalars(self.floatArray(d))
 
 
 class Scene(object):
