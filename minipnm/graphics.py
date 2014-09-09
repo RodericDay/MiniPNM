@@ -208,6 +208,10 @@ class Scene(object):
             camera.SetCurrentRenderer(self.ren)
             self.iren.SetInteractorStyle(camera)
 
+        self.picker = vtk.vtkCellPicker()
+        self.iren.SetPicker(self.picker)
+        self.picker.AddObserver("EndPickEvent", self.handle_pick)
+
     def __iter__(self):
         for aid in range(self.ren.VisibleActorCount()):
             actor = self.ren.GetActors().GetItemAsObject(aid)
@@ -219,7 +223,17 @@ class Scene(object):
                    GetPointData().GetScalars().GetNumberOfTuples()
                    for actor in self)
 
-    def update_all(self, object=None, event=None, t=None):
+    def handle_pick(self, obj, event):
+        try:
+            actor = self.picker.GetActor()
+            glyph3D = actor.glyph3D
+            pointIds = glyph3D.GetOutput().GetPointData().GetArray("InputPointIds")
+            selectedId = int(pointIds.GetTuple1(self.picker.GetPointId()))
+            print selectedId
+        except:
+            pass
+
+    def update_all(self, obj=None, event=None, t=None):
         if t is None:   t = next(self.ticks)
         for actor in self:
             actor.update(t)
