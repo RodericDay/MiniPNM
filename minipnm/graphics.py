@@ -45,16 +45,14 @@ class Actor(vtk.vtkActor):
             floats.InsertNextValue(n)
         return floats
 
-    def colorArray(self, array, cmap=None):
-        colors = vtk.vtkUnsignedCharArray()
-        colors.SetNumberOfComponents(3)
-        if cmap is None:
-            cmap = 'coolwarm'
-        colormap = cm.get_cmap(cmap)
-        mapped = colormap(array)
-        for r,g,b,a in 255*mapped:
-            colors.InsertNextTuple3(r,g,b)
-        return colors
+    def set_scalars(self, values):
+        floats = vtk.vtkFloatArray()
+        for v in values:
+            floats.InsertNextValue(v)
+        self.polydata.GetPointData().SetScalars(floats)
+
+    def connect(self, fun):
+        self.callable = fun
 
     def update(self, t=0):
         pass
@@ -76,15 +74,26 @@ class Wires(Actor):
             weights = np.atleast_2d(vertex_weights)
             weights = np.subtract(weights, weights.min())
             weights = np.true_divide(weights, weights.max())
-        self.weights = weights
+        self.weights = vertex_weights
         self.cmap = cmap
         self.update()
 
         self.GetProperty().SetOpacity(alpha)
 
+    def set_scalars(self, values, cmap=None):
+        colors = vtk.vtkUnsignedCharArray()
+        colors.SetNumberOfComponents(3)
+        if cmap is None:
+            cmap = 'coolwarm'
+        colormap = cm.get_cmap(cmap)
+        mapped = colormap(values)
+        for r,g,b,a in 255*mapped:
+            colors.InsertNextTuple3(r,g,b)
+        self.polydata.GetPointData().SetScalars(colors)
+
     def update(self, t=0):
         i = t % len(self.weights)
-        self.polydata.GetPointData().SetScalars(self.colorArray(self.weights[i], self.cmap))
+        self.set_scalars(self.weights[i], self.cmap)
 
 
 class Surface(Actor):
@@ -229,9 +238,11 @@ class Scene(object):
             glyph3D = actor.glyph3D
             pointIds = glyph3D.GetOutput().GetPointData().GetArray("InputPointIds")
             selectedId = int(pointIds.GetTuple1(self.picker.GetPointId()))
-            print selectedId
-        except:
-            pass
+            actor.callable(selectedId)
+            actor.polydata.Modified()
+            self.renWin.Render()
+        except Exception as e:
+            print e
 
     def update_all(self, obj=None, event=None, t=None):
         if t is None:   t = next(self.ticks)
