@@ -1,6 +1,6 @@
 from tempfile import NamedTemporaryFile
 from subprocess import call
-from itertools import count
+import itertools as it
 import numpy as np
 from matplotlib import cm
 
@@ -10,40 +10,31 @@ except ImportError:
     vtk = type("vtk module missing. functionality unavailable!",
                (), {'vtkActor': object})
 
+def bind(array):
+    array = np.atleast_2d(array).astype(float)
+    array = np.subtract(array, array.min())
+    array = np.divide(array, array.max()) if array.max() != 0 else array
+    return array
+
 class Actor(vtk.vtkActor):
 
     def __init__(self):
         raise NotImplementedError()
 
-    def pointArray(self, _points):
-        points = vtk.vtkPoints()
-        for x,y,z in _points:
-            points.InsertNextPoint(x, y, z)
-        return points
+    def set_points(self, points):
+        pointArray = vtk.vtkPoints()
+        for x,y,z in points:
+            pointArray.InsertNextPoint(x, y, z)
+        self.polydata.SetPoints(pointArray)
 
-    def lineArray(self, _lines):
-        lines = vtk.vtkCellArray()
-        for id_set in _lines:
-            l = vtk.vtkIdList()
-            for i in id_set:
-                l.InsertNextId(i)
-            lines.InsertNextCell(l)
-        return lines
-
-    def faceArray(self, faces):
-        lines = vtk.vtkCellArray()
-        for face in faces:
-            l = vtk.vtkIdList()
-            for i in face:
-                l.InsertNextId(i)
-            lines.InsertNextCell(l)
-        return lines
-
-    def floatArray(self, array):
-        floats = vtk.vtkFloatArray()
-        for n in array:
-            floats.InsertNextValue(n)
-        return floats
+    def set_lines(self, lines):
+        cellArray = vtk.vtkCellArray()
+        for ids in lines:
+            idList = vtk.vtkIdList()
+            for i in ids:
+                idList.InsertNextId(i)
+            cellArray.InsertNextCell(idList)
+        self.polydata.SetLines(cellArray)
 
     def set_scalars(self, values):
         floats = vtk.vtkFloatArray()
@@ -55,100 +46,83 @@ class Actor(vtk.vtkActor):
         self.callable = fun
 
     def update(self, t=0):
-        pass
+        i = t % len(self.script)
+        self.set_scalars(self.script[i])
 
 
 class Wires(Actor):
-
-    def __init__(self, vertex_coords, edge_pairs, vertex_weights=None, alpha=1, cmap=None):
+    '''
+    Points and lines. The script determines the color of the lines.
+    '''
+    def __init__(self, points, pairs, values=None, alpha=1, cmap=None):
         self.polydata = vtk.vtkPolyData()
-        self.polydata.SetPoints(self.pointArray(vertex_coords))
-        self.polydata.SetLines(self.lineArray(edge_pairs))
+        self.set_points(points)
+        self.set_lines(pairs)
         self.mapper = vtk.vtkPolyDataMapper()
         self.mapper.SetInput(self.polydata)
         self.SetMapper(self.mapper)
 
-        if vertex_weights is None:
-            weights = np.atleast_2d([128 for _ in vertex_coords])
-        else:
-            weights = np.atleast_2d(vertex_weights)
-            weights = np.subtract(weights, weights.min())
-            weights = np.true_divide(weights, weights.max())
-        self.weights = weights
+        if values is None:
+            values = [0.5 for _ in points]
+        self.script = 255*bind(values)
         self.cmap = cmap
         self.update()
 
         self.GetProperty().SetOpacity(alpha)
 
-    def set_scalars(self, values, cmap=None):
+    def set_scalars(self, values):
         colors = vtk.vtkUnsignedCharArray()
         colors.SetNumberOfComponents(3)
-        if cmap is None:
-            cmap = 'coolwarm'
-        colormap = cm.get_cmap(cmap)
-        mapped = colormap(values)
+        if self.cmap is None:
+            self.cmap = 'coolwarm'
+        colormap = cm.get_cmap(self.cmap)
+        mapped = colormap(values.astype(int))
         for r,g,b,a in 255*mapped:
             colors.InsertNextTuple3(r,g,b)
         self.polydata.GetPointData().SetScalars(colors)
 
-    def update(self, t=0):
-        i = t % len(self.weights)
-        self.set_scalars(self.weights[i], self.cmap)
 
+class Spheres(Actor):
 
-class Surface(Actor):
-
-    def __init__(self, vertex_coords, edge_pairs, vertex_weights=None, alpha=1,
-                 cmap=None, offset=0):
-        self.offset = offset
+    def __init__(self, centers, radii, alpha=1, color=(1,1,1)):
         self.polydata = vtk.vtkPolyData()
-        self.polydata.SetPoints(self.pointArray(vertex_coords))
-        self.polydata.SetLines(self.lineArray(edge_pairs))
+        self.set_points(centers)
+
+        self.source = vtk.vtkSphereSource()
+        self.glyph3D = vtk.vtkGlyph3D()
+        self.glyph3D.SetSourceConnection(self.source.GetOutputPort())
+        self.glyph3D.SetInput(self.polydata)
+        self.glyph3D.GeneratePointIdsOn()
+        self.glyph3D.Update()
+
         self.mapper = vtk.vtkPolyDataMapper()
-        self.mapper.SetInput(self.polydata)
+        self.mapper.SetInputConnection(self.glyph3D.GetOutputPort())
         self.SetMapper(self.mapper)
 
-        if vertex_weights is None:
-            weights = np.atleast_2d([128 for _ in vertex_coords])
-        else:
-            weights = np.atleast_2d(vertex_weights)
-        self.weights = weights
-        self.cmap = cmap
-        self.update()
+        self.script = 2*np.atleast_2d(radii)
 
         self.GetProperty().SetOpacity(alpha)
-
-    def update(self, t=0):
-        i = t % len(self.weights)
-        values = self.weights[i]
-        # update z-positions
-        points = self.polydata.GetPoints()
-        for i, v in enumerate(values):
-            x,y,_ = points.GetPoint(i)
-            points.SetPoint(i, x, y, v+self.offset)
-        # update colors
-        normalized = np.true_divide(values, np.abs(self.weights).max())
-        normalized = np.subtract(normalized, self.weights.min())
-        colors = self.colorArray(normalized, self.cmap)
-        self.polydata.GetPointData().SetScalars(colors)
+        r,g,b = color
+        self.mapper.ScalarVisibilityOff()
+        self.GetProperty().SetColor(r,g,b)
 
 
 class Tubes(Actor):
 
     def __init__(self, centers, vectors, radii, alpha=1, cmap=None):
-        tails = centers - vectors/2.
-        heads = centers + vectors/2.
+        tails = centers - np.divide(vectors, 2.)
+        heads = centers + np.divide(vectors, 2.)
         points = np.vstack(zip(tails, heads))
         pairs = np.arange(len(centers)*2).reshape(-1, 2)
-        radii = radii.repeat(2)
+        radii = np.hstack([radii, radii])
 
         assert (points.size/3. == pairs.size)
         assert (pairs.size == radii.size)
 
         self.polydata = vtk.vtkPolyData()
-        self.polydata.SetPoints(self.pointArray(points))
-        self.polydata.SetLines(self.lineArray(pairs))
-        self.polydata.GetPointData().SetScalars(self.floatArray(radii))
+        self.set_points(points)
+        self.set_lines(pairs)
+        self.set_scalars(radii)
 
         self.tubeFilter = vtk.vtkTubeFilter()
         self.tubeFilter.SetInput(self.polydata)
@@ -163,39 +137,12 @@ class Tubes(Actor):
 
         self.GetProperty().SetOpacity(alpha)
 
-
-class Spheres(Actor):
-
-    def __init__(self, centers, radii, alpha=1, color=(1,1,1)):
-        self.radii = np.atleast_2d(radii)
-        self.polydata = vtk.vtkPolyData()
-        self.polydata.SetPoints(self.pointArray(centers))
-        self.update()
-
-        self.source = vtk.vtkSphereSource()
-        self.glyph3D = vtk.vtkGlyph3D()
-        self.glyph3D.SetSourceConnection(self.source.GetOutputPort())
-        self.glyph3D.SetInput(self.polydata)
-        self.glyph3D.GeneratePointIdsOn()
-        self.glyph3D.Update()
-
-        self.mapper = vtk.vtkPolyDataMapper()
-        self.mapper.SetInputConnection(self.glyph3D.GetOutputPort())
-        self.SetMapper(self.mapper)
-
-        self.GetProperty().SetOpacity(alpha)
-        r,g,b = color
-        self.mapper.SetScalarVisibility(False)
-        self.GetProperty().SetColor(r,g,b)
-
     def update(self, t=0):
-        i = t % len(self.radii)
-        d = 2*self.radii[i]
-        self.polydata.GetPointData().SetScalars(self.floatArray(d))
+        pass
 
 
 class Scene(object):
-    ticks = count(0)
+    ticks = it.count(0)
 
     def __init__(self, parent=None, fix_camera=True):
         '''
@@ -232,11 +179,7 @@ class Scene(object):
         return len([actor for actor in self])
         
     def __len__(self):
-        if self.count == 0:
-            return 1
-        return min(actor.polydata.
-                   GetPointData().GetScalars().GetNumberOfTuples()
-                   for actor in self)
+        return min(len(actor.script) for actor in self)
 
     def handle_pick(self, obj, event):
         try:
