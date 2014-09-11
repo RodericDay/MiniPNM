@@ -70,22 +70,6 @@ def test_qhull_coplanar():
     network = mini.Delaunay(points)
     network.boundary()
 
-def test_sphere_stuff():
-    N = 20
-    x = np.arange(-N,N)
-    y = np.arange(-N,N)
-    X,Y = np.meshgrid(x,y)
-    Z = np.sqrt(X**2 + Y**2)
-    im = Z < Z.mean()
-
-    network = mini.Cubic.from_source(im)
-    network = network - im
-
-    centers, radii = mini.image.extract_spheres(im)
-    sphere = mini.PackedSpheres(centers, radii)
-
-    stitched = mini.binary.radial_join(network, sphere)
-
 def test_lengths():
     # create a voxelized sphere. black (1s) is void.
     N = 13

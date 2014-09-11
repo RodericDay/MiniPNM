@@ -339,26 +339,6 @@ class Delaunay(Network):
         return edges
 
 
-class PackedSpheres(Network):
-
-    def __init__(self, centers, radii, tpt=0):
-        '''
-        tpt = throat proximity threshold
-        '''
-        self.points = centers
-        self['radii'] = radii
-
-        pairs = []
-        for ia, ib in itertools.combinations(range(len(centers)), 2):
-            distance = np.linalg.norm(centers[ib]-centers[ia])
-            radsum = radii[ia]+radii[ib]
-            if (distance - radsum) < tpt:
-                pairs.append([ia,ib])
-
-        if pairs:
-            self.pairs = np.array(pairs)
-
-
 class Radial(Network):
     '''
     Takes in points, sphere radii, and returns a fleshed out network consisting
@@ -400,29 +380,3 @@ class Radial(Network):
 
         history = graphics.Spheres(self.points, self['sphere_radii']*saturation_history*0.99, color=(0,0,1))
         return [shells, tubes, history]
-
-
-class Voronoi(Network):
-    '''
-    Network based on Voronoi tessellation, with non-uniform pore geometry
-
-    Storage involves an additional set of points (vx, vy, vz), and an array of
-    indexes (vi) coupled with an array of numbers of points (vn) that allows us
-    to determine which intersecting points belong to each point.
-
-    Throats are determined by noting that any two points which share 3+ indexes
-    are connected by a surface
-    '''
-    def __init__(self):
-        bridson = mini.Bridson([20,20,10])
-        # the shells are formed by the vertices and regions
-        # the input can be recovered from points
-        # and Delaunay is ridge_points
-        voronoi = Voronoi(bridson.points)
-        # get points
-        points = voronoi.vertices
-        # some points are invalid
-        bad_ids = {-1} | set(np.any(np.abs(points)>bridson.dims//2, axis=1).nonzero()[0])
-        # only pure regions allowed
-        good_ids = set(it.chain.from_iterable(r for r in voronoi.regions if not (set(r) & bad_ids)))
-        faces = [v+v[:1] for v in voronoi.ridge_vertices if good_ids.issuperset(v)]
