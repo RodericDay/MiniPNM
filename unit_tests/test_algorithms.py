@@ -56,7 +56,7 @@ def test_shortest_path():
     assert matrix.A1[path3].sum() == 2297
 
 def test_poisson_disk_sampling():
-    xyz, r = mini.algorithms.poisson_disk_sampling([10,10], 1)
+    xyz, r = mini.algorithms.poisson_disk_sampling(r=1, bbox=[10,10])
     # no colliding spheres
     collisions = []
     for i,j in it.combinations(range(len(r)), 2):
