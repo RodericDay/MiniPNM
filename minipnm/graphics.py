@@ -74,7 +74,7 @@ class Wires(Actor):
             weights = np.atleast_2d(vertex_weights)
             weights = np.subtract(weights, weights.min())
             weights = np.true_divide(weights, weights.max())
-        self.weights = vertex_weights
+        self.weights = weights
         self.cmap = cmap
         self.update()
 
@@ -227,7 +227,13 @@ class Scene(object):
             if hasattr(actor, 'update'):
                 yield actor
 
+    @property
+    def count(self):
+        return len([actor for actor in self])
+        
     def __len__(self):
+        if self.count == 0:
+            return 1
         return min(actor.polydata.
                    GetPointData().GetScalars().GetNumberOfTuples()
                    for actor in self)
