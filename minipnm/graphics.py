@@ -106,6 +106,8 @@ class Spheres(Actor):
         self.mapper.ScalarVisibilityOff()
         self.GetProperty().SetColor(r,g,b)
 
+        self.update()
+
 
 class Tubes(Actor):
 
@@ -171,7 +173,7 @@ class Scene(object):
     def __iter__(self):
         for aid in range(self.ren.VisibleActorCount()):
             actor = self.ren.GetActors().GetItemAsObject(aid)
-            if hasattr(actor, 'update'):
+            if hasattr(actor, 'script'):
                 yield actor
 
     @property
@@ -179,7 +181,7 @@ class Scene(object):
         return len([actor for actor in self])
         
     def __len__(self):
-        return min(len(actor.script) for actor in self)
+        return max(len(actor.script) for actor in self)
 
     def handle_pick(self, obj, event):
         try:
