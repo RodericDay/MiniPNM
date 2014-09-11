@@ -9,7 +9,6 @@ import warnings
 import numpy as np
 from scipy import spatial, sparse
 
-from .misc import laplacian
 from .algorithms import poisson_disk_sampling
 from . import utils
 from . import geometry
@@ -66,14 +65,14 @@ class Network(dict):
         return np.linalg.norm(self.spans, axis=1).astype('float16')
 
     @property
+    def diagonals(self):
+        return sparse.diags(np.ones(self.order), 0)
+
+    @property
     def adjacency_matrix(self):
         tails, heads = self.pairs.T
         ijk = np.ones_like(tails), (heads, tails)
         return sparse.coo_matrix(ijk, shape=(self.order, self.order))
-
-    @property
-    def laplacian(self):
-        return laplacian(self.adjacency_matrix)
 
     @property
     def labels(self):
@@ -94,6 +93,20 @@ class Network(dict):
     @property
     def indexes(self):
         return np.arange(self.order)
+
+    @property
+    def laplacian(self):
+        return self.system(nvalues=-self.adjacency_matrix.sum(axis=1).A1)
+
+    def system(self, cvalues=1, nvalues=1):
+        '''
+        Returns a matrix representing a system of equations
+        '''
+        A = self.adjacency_matrix.astype(float)
+        A.data *= cvalues
+        D = self.diagonals.astype(float)
+        D.data *= nvalues
+        return A + D
 
     def boundary(self):
         all_points = self.indexes
