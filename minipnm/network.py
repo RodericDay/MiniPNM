@@ -357,7 +357,7 @@ class Radial(Network):
         self.pairs = np.array(pairs)
 
         self['sphere_radii'] = np.array(radii)
-        self['cylinder_radii'] = self['sphere_radii'][self.pairs].min(axis=1)/4.
+        self['cylinder_radii'] = self['sphere_radii'][self.pairs].min(axis=1)/2.
         self.spans, self.midpoints = geometry.cylinders(self.points, self['sphere_radii'], self.pairs)
         self.prune_colliding()
 
@@ -378,5 +378,7 @@ class Radial(Network):
         if saturation_history is None:
             return [shells, tubes]
 
-        history = graphics.Spheres(self.points, self['sphere_radii']*saturation_history*0.99, color=(0,0,1))
+        capacity = 4./3. * np.pi * self['sphere_radii']**3
+        fill_radii = (capacity * saturation_history * 3./4. / np.pi)**(1./3.)
+        history = graphics.Spheres(self.points, fill_radii, color=(0,0,1))
         return [shells, tubes, history]
