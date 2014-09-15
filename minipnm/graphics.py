@@ -116,7 +116,7 @@ class Tubes(Actor):
         heads = centers + np.divide(vectors, 2.)
         points = np.vstack(zip(tails, heads))
         pairs = np.arange(len(centers)*2).reshape(-1, 2)
-        radii = np.hstack([radii, radii])
+        radii = np.repeat(radii, 2)
 
         assert (points.size/3. == pairs.size)
         assert (pairs.size == radii.size)
@@ -138,6 +138,8 @@ class Tubes(Actor):
         self.SetMapper(self.mapper)
 
         self.GetProperty().SetOpacity(alpha)
+
+        self.script = [0]
 
     def update(self, t=0):
         pass
