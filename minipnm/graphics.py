@@ -42,9 +42,6 @@ class Actor(vtk.vtkActor):
             floats.InsertNextValue(v)
         self.polydata.GetPointData().SetScalars(floats)
 
-    def connect(self, fun):
-        self.callable = fun
-
     def update(self, t=0):
         i = t % len(self.script)
         self.set_scalars(self.script[i])
@@ -186,16 +183,13 @@ class Scene(object):
         return max(len(actor.script) for actor in self)
 
     def handle_pick(self, obj, event):
-        try:
-            actor = self.picker.GetActor()
-            glyph3D = actor.glyph3D
-            pointIds = glyph3D.GetOutput().GetPointData().GetArray("InputPointIds")
-            selectedId = int(pointIds.GetTuple1(self.picker.GetPointId()))
-            actor.callable(selectedId)
-            actor.polydata.Modified()
-            self.renWin.Render()
-        except Exception as e:
-            print e
+        actor = self.picker.GetActor()
+        glyph3D = actor.glyph3D
+        pointIds = glyph3D.GetOutput().GetPointData().GetArray("InputPointIds")
+        selectedId = int(pointIds.GetTuple1(self.picker.GetPointId()))
+        actor.callable(selectedId)
+        actor.polydata.Modified()
+        self.renWin.Render()
 
     def update_all(self, obj=None, event=None, t=None):
         if t is None:   t = next(self.ticks)
