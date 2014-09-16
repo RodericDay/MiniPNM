@@ -1,56 +1,58 @@
+from collections import defaultdict
 import numpy as np
 import minipnm as mini
 
-network = mini.Cubic([30,60])
+network = mini.Cubic([10,10])
 x,y,z = network.coords
-left = x==x.min()
-right = x==x.max()
-tophalf = y>y.mean()
-dbcs = {0: left, 1:right&tophalf}
 
-time = np.linspace(0,1,100)
-oxygen, protons, activity, vapor, water, ice = [], [], [], [], [], []
-for t in time:
-    if len(water) == 0:
-        water.append(np.ones(network.order, dtype=bool))
+RHS = network.system(-0.1, 1+4*0.1)
+LHS = network.system( 0.1, 1-4*0.1)
+def diffuse_oxygen(sinks=None, obstacles=None):
+    A = RHS
+    b = LHS * history.get('oxygen_concentration',[0])[-1]
+    s = mini.algorithms.bvp.spsolve(A, b)
+    return s
 
-    flooded = ~water[-1]
-    pruned = network - flooded
-    sol = mini.algorithms.bvp.solve(pruned.laplacian, dbcs)
-    oxygen.append(sol)
+proton_concentration = x.max()-x
 
-    # activity is flux
-    adj = pruned.adjacency_matrix
-    adj.data = abs(sol[adj.col] - sol[adj.row])
-    rate = 1E5*adj.mean(axis=1).A1
-    activity.append(rate)
+def diffuse_heat(sources):
+    return x
 
-    # temperature depends on rate
+def distribute_water(additions):
+    return np.ones(network.order)
 
-    # generate vapor proportional to activity
-    vapor.append(vapor[-1]+rate if vapor else rate)
+def form_ice(water, temperature):
+    return np.in1d(network.indexes, np.random.choice(network.indexes, 10))
 
-    # water fill step- currently req'd for interesting results
-    candidates = (~flooded).nonzero()[0]
-    if any(candidates):
-        chosen = np.random.choice(candidates, 10)
-        flooded[chosen] = True
-    water.append(~flooded)
+k1 = 1
+k2 = 1
+dt = 0.001
+history = defaultdict(list)
+def march(time):
+    oxygen_concentration = diffuse_oxygen()
+    activity = proton_concentration * oxygen_concentration
+    temperature = diffuse_heat(k1*activity)
+    water = distribute_water(k2*activity)
+    ice = form_ice(water, temperature)
+    for key, value in locals().items():
+        history[key].append(value)
 
-    # ice freeze step
-    ice.append( flooded*rate )
+for t in (round(i*dt,3) for i in range(10)):
+    march(t)
+
+for key, value in history.items():
+    history[key] = np.array(value)
 
 gui = mini.GUI()
-network.render(gui.scene, oxygen, cmap='Greens_r')
-network['x'] += 40
-network.render(gui.scene, activity, cmap='copper')
-# network['x'] += 40
-# network.render(gui.scene, temperature, cmap='hot')
-network['x'] += 40
-network.render(gui.scene, vapor)
-network['x'] += 40
-network.render(gui.scene, water)
-network['x'] += 40
-network.render(gui.scene, ice)
-gui.plotXY(time, np.max(activity, axis=1))
+
+gas_actor = mini.graphics.Spheres(network.points, history['oxygen_concentration']*0.5, alpha=0.25)
+gas_actor.mapper.ScalarVisibilityOn()
+gas_actor.glyph3D.ScalingOff()
+temp_actor = mini.graphics.Wires(network.points, network.pairs, history['temperature'])
+water_actor = mini.graphics.Spheres(network.points, history['water']*0.3, color=(0,0,1), alpha=0.5)
+ice_actor = mini.graphics.Spheres(network.points, history['ice']*0.4)
+t, y = history['time'], np.sum(history['oxygen_concentration'], axis=1)
+
+gui.scene.add_actors([gas_actor, water_actor, ice_actor])
+gui.plot(t, y)
 gui.run()
