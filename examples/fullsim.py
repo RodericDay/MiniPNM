@@ -1,58 +1,50 @@
-from collections import defaultdict
 import numpy as np
+from scipy import sparse
+from scipy.sparse.linalg import spsolve
 import minipnm as mini
 
-network = mini.Cubic([10,10])
-x,y,z = network.coords
+class DiffusionSimulation(object):
 
-RHS = network.system(-0.1, 1+4*0.1)
-LHS = network.system( 0.1, 1-4*0.1)
-def diffuse_oxygen(sinks=None, obstacles=None):
-    A = RHS
-    b = LHS * history.get('oxygen_concentration',[0])[-1]
-    s = mini.algorithms.bvp.spsolve(A, b)
-    return s
+    def __init__(self, adj, u, insulated=None):
+        adjsum = adj.sum(axis=1).A1
+        if insulated is None:
+            adjsum = adjsum.max()
+        else:
+            adjsum[~insulated] = adjsum.max()
+        self.RHS = -u*adj + sparse.diags(1+adjsum*u, 0)
+        self.LHS =  u*adj + sparse.diags(1-adjsum*u, 0)
+        self.state = np.zeros_like(adjsum, dtype=float)
 
-proton_concentration = x.max()-x
+    def march(self, changes):
+        self.state = spsolve(self.RHS, self.LHS*self.state + changes)
+        return self.state
 
-def diffuse_heat(sources):
-    return x
 
-def distribute_water(additions):
-    return np.ones(network.order)
+cubic = mini.Cubic([10,10])
+rmin = 0.1
+radii = np.random.rand(cubic.order)*(0.5-rmin)+rmin
+capacities = 4./3. * np.pi * radii**3
+radial = mini.Radial(cubic.points, radii, cubic.pairs)
+conductance_matrix = radial.adjacency_matrix
+conductance_matrix.data = 1./radial.lengths
 
-def form_ice(water, temperature):
-    return np.in1d(network.indexes, np.random.choice(network.indexes, 10))
+tgrid = mini.Cubic([100,100], 0.091) # <- weird constant req'd. fix this pls.
+x,y,z = tgrid.coords
+top = y==y.max()
+bottom = y==y.min()
+right = x==x.min()
+left = x==x.max()
 
-k1 = 1
-k2 = 1
-dt = 0.001
-history = defaultdict(list)
-def march(time):
-    oxygen_concentration = diffuse_oxygen()
-    activity = proton_concentration * oxygen_concentration
-    temperature = diffuse_heat(k1*activity)
-    water = distribute_water(k2*activity)
-    ice = form_ice(water, temperature)
-    for key, value in locals().items():
-        history[key].append(value)
+water_generator = (0.01*(radial['x']==0) for _ in iter(int, 1))
+water_handler = mini.algorithms.InvasionSimulation(capacities, conductance_matrix)
+heat_generator = (0.01*(tgrid['x']==0) for _ in iter(int, 1))
+temp_handler = DiffusionSimulation(tgrid.adjacency_matrix, u=100, insulated=top|bottom|left|right)
+water_history, temp_history = [], []
+for t in range(50):
+    water_history.append( water_handler.distribute(next(water_generator)) )
+    temp_history.append( temp_handler.march(next(heat_generator)) )
 
-for t in (round(i*dt,3) for i in range(10)):
-    march(t)
-
-for key, value in history.items():
-    history[key] = np.array(value)
-
-gui = mini.GUI()
-
-gas_actor = mini.graphics.Spheres(network.points, history['oxygen_concentration']*0.5, alpha=0.25)
-gas_actor.mapper.ScalarVisibilityOn()
-gas_actor.glyph3D.ScalingOff()
-temp_actor = mini.graphics.Wires(network.points, network.pairs, history['temperature'])
-water_actor = mini.graphics.Spheres(network.points, history['water']*0.3, color=(0,0,1), alpha=0.5)
-ice_actor = mini.graphics.Spheres(network.points, history['ice']*0.4)
-t, y = history['time'], np.sum(history['oxygen_concentration'], axis=1)
-
-gui.scene.add_actors([gas_actor, water_actor, ice_actor])
-gui.plot(t, y)
-gui.run()
+scene = mini.Scene()
+scene.add_actors(radial.actors(water_history))
+scene.add_actors(tgrid.actors(temp_history, alpha=0.2))
+scene.play()
