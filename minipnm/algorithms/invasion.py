@@ -33,6 +33,15 @@ def invasion(adjacency_matrix, sources, sinks=None):
     return np.vstack(history)
 
 
+class NeighborsSaturated(Exception):
+    msg = "All neighbors of node {} saturated. Network saturation: {}%"
+    def __init__(self, node, saturation):
+        self.node = node
+        self.saturation = saturation
+    def __str__(self):
+        return self.msg.format(self.node, self.saturation.mean()*100)
+
+
 class InvasionSimulation(object):
     '''
     This class simulates alop invasion with fractional generation in arbitrary
@@ -43,6 +52,17 @@ class InvasionSimulation(object):
         self.con = conductance_matrix
         self.saturation = np.zeros_like(capacities)
 
+    def until_saturation(self, generator):
+        history = [self.saturation.copy()]
+        while True:
+            try:
+                self.distribute(next(generator))
+                history.append(self.saturation.copy())
+            except NeighborsSaturated as e:
+                history.append(e.saturation)
+                break
+        return history
+
     def distribute(self, generation):
         content = self.capacities*self.saturation + generation
         excess = content.clip(self.capacities, content) - self.capacities
@@ -52,8 +72,7 @@ class InvasionSimulation(object):
             for node in excess.nonzero()[0]:
                 recipient = self.find_unsaturated_neighbor(node)
                 if node == recipient:
-                    raise Exception("Infinite loop")
-                    return self.saturation
+                    raise NeighborsSaturated(node, self.saturation)
                 excess[recipient] += excess[node]
                 excess[node] = 0
             return self.distribute(excess)
