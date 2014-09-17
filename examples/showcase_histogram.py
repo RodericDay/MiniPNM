@@ -12,17 +12,14 @@ g = (np.random.choice(arr) for _ in iter(int,1))
 t0 = time.time()
 centers, radii = mini.algorithms.poisson_disk_sampling(r=g, bbox=[10,10])
 tt = time.time()-t0
-print tt
 
 network = mini.Radial(centers, radii)
-print network
 x,y,z = network.coords
-hist = mini.algorithms.invasion(network.adjacency_matrix, x==x.min())
 gui = mini.GUI()
-network.render(hist, scene=gui.scene)
+network.render(scene=gui.scene)
 gui.run()
 
 plt.hist(arr, bins=50, alpha=0.5, normed=True)
 plt.hist(network['sphere_radii'], bins=50, alpha=0.5, normed=True)
 plt.title("{} pores generated in {:.1f}s".format(network.order, tt))
-# plt.show()
+plt.show()
