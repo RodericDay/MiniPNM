@@ -12,6 +12,7 @@ from .misc import *
 from .utils import *
 from .binary import *
 from . import algorithms
+from .algorithms import simulations
 from . import geometry
 from . import image
 from . import graphics

@@ -16,7 +16,7 @@ def test_linear_solver():
     r_flux = -np.subtract(*network.cut(r, sol)).sum()
     assert np.allclose(l_flux, r_flux)
 
-def test_invasion():
+def disable_test_invasion():
     network = mini.Cubic([20,20])
     x,y,z = network.coords
     sol = mini.algorithms.invasion(network.adjacency_matrix, x==x.min(), x==x.max())

@@ -1,36 +1,39 @@
 import numpy as np
 from scipy import sparse
+from scipy.sparse.linalg import spsolve
+from .. import graphics
 
-def invasion(adjacency_matrix, sources, sinks=None):
+
+class Simulation(object):
     '''
-    Most basic textbook example of sequential invasion
+    Automates keeping track of an evolving history
     '''
-    tails = adjacency_matrix.row
-    heads = adjacency_matrix.col
-    conductance = adjacency_matrix.data
+    @property
+    def state(self):
+        return self.history[-1].copy()
 
-    # Assign a list of pores that are initially filled with liquid water
-    state = sources
-    history = [state.copy()]
+    @state.setter
+    def state(self, array):
+        self.history.append(array)
 
-    # Repeat until percolation or predefined stopping point
-    while not all(state):
-        # Identify interfacial throats (between unsaturated and saturated pores)
-        saturated = state.nonzero()[0]
-        interfacial_throats = np.in1d(tails, saturated) & ~np.in1d(heads, saturated)
 
-        # Check for breakthrough conditions
-        if sinks is not None and any(state[sinks]): break
-        elif not any(interfacial_throats): break
+class Diffusion(Simulation):
+    '''
+    Crank-Nicholson method
+    u ~ CFL number
+    '''
+    def __init__(self, adj, u, insulated=None, T0=0):
+        adjsum = adj.sum(axis=1).A1
+        if insulated is None:
+            adjsum = adjsum.max()
+        else:
+            adjsum[~insulated] = adjsum.max()
+        self.RHS = -u*adj + sparse.diags(1+adjsum*u, 0)
+        self.LHS =  u*adj + sparse.diags(1-adjsum*u, 0)
+        self.history = [T0*np.ones_like(adjsum, dtype=float)]
 
-        # Identify the interfacial throat, thmin, with lowest entry pressure
-        thmin = max(interfacial_throats.nonzero()[0], key=conductance.item)
-        next_fill = heads[thmin]
-        conductance[next_fill] = 0
-        state[next_fill] = True
-        history.append(state.copy())
-
-    return np.vstack(history)
+    def march(self, changes):
+        self.state = spsolve(self.RHS, self.LHS*self.state + changes)
 
 
 class NeighborsSaturated(Exception):
@@ -42,26 +45,26 @@ class NeighborsSaturated(Exception):
         return self.msg.format(self.node, self.saturation.mean()*100)
 
 
-class InvasionSimulation(object):
+class Invasion(Simulation):
     '''
     This class simulates alop invasion with fractional generation in arbitrary
     pores simultaneously
     '''
+
     def __init__(self, capacities, conductance_matrix):
         self.capacities = capacities
         self.con = conductance_matrix
         self.saturation = np.zeros_like(capacities)
+        self.history = [np.zeros_like(capacities)]
+        self.block_history = [np.zeros_like(capacities, dtype=bool)]
 
     def until_saturation(self, generator):
-        history = [self.saturation.copy()]
         while True:
             try:
                 self.distribute(next(generator))
-                history.append(self.saturation.copy())
             except NeighborsSaturated as e:
-                history.append(e.saturation)
                 break
-        return history
+        return self.history
 
     def distribute(self, generation):
         content = self.capacities*self.saturation + generation
@@ -76,13 +79,15 @@ class InvasionSimulation(object):
                 excess[recipient] += excess[node]
                 excess[node] = 0
             return self.distribute(excess)
+        self.history.append( self.saturation )
         return self.saturation
 
     def find_unsaturated_neighbor(self, node):
         self.update_pressurized_clusters()
         full_sources = self.labels[self.con.col]==self.labels[node]
         non_full_sinks = self.saturation[self.con.row] < 0.999
-        viable_throats = full_sources & non_full_sinks
+        not_blocked = self.con.data > 0
+        viable_throats = full_sources & non_full_sinks & not_blocked
         viable_throats = viable_throats.nonzero()[0] # bool -> idxs
         if len(viable_throats) == 0:
             return node
@@ -104,3 +109,17 @@ class InvasionSimulation(object):
         s = self.capacities.size
         coo = sparse.coo_matrix((v, (i, j)), shape=(s,s))
         self.labels = sparse.csgraph.connected_components(coo)[1]
+
+    def block(self, nodes):
+        self.block_history.append(self.block_history[-1] + nodes)
+        indexes = nodes.nonzero()[0]
+        blocked = np.in1d(self.con.col, indexes)
+        self.con.data[blocked] = -1
+
+    def render(self, points, scene):
+        fill_radii = (self.capacities*self.history*3./4./np.pi)**(1./3.)
+        balloons = graphics.Spheres(points, fill_radii, color=(0,0,1))
+
+        radii = (self.capacities*3./4./np.pi)**(1./3.)
+        snowballs = graphics.Spheres(points, radii*self.block_history, alpha=0.75)
+        scene.add_actors([balloons, snowballs])

@@ -9,7 +9,6 @@ import warnings
 import numpy as np
 from scipy import spatial, sparse
 
-from .algorithms import poisson_disk_sampling
 from . import utils
 from . import geometry
 from . import graphics
@@ -116,35 +115,6 @@ class Network(dict):
     def save(self, filename):
         minipnm.save_vtp(self, filename)
         self.filename = filename
-
-    def render(self, *args, **kwargs):
-        wait = True
-        if 'scene' in kwargs:
-            scene = kwargs.pop('scene')
-        else:
-            scene = graphics.Scene()
-            wait = False
-
-        scene.add_actors(self.actors(*args, **kwargs))
-
-        if not wait:
-            scene.play()
-
-    def actors(self, values=None, **kwargs):
-        try:
-            # to load as if given a key
-            values = self[values]
-        except KeyError:
-            # show error, but plot anyway (fail gracefully?)
-            if values:
-                traceback.print_exc()
-                values = None
-        except TypeError:
-            # probably an array, but make sure it fits!
-            assert np.array(values).shape[-1] == self.order
-        finally:
-            wires = graphics.Wires(self.points, self.pairs, values, **kwargs)
-        return [wires]
 
     def merge(self, other, axis=2, spacing=None, centering=False, stitch=False):
         new = Network()
@@ -274,6 +244,35 @@ class Network(dict):
         new = self.copy()
         new.prune(inaccessible, remove_pores=False)
         return new
+
+    def render(self, *args, **kwargs):
+        wait = True
+        if 'scene' in kwargs:
+            scene = kwargs.pop('scene')
+        else:
+            scene = graphics.Scene()
+            wait = False
+
+        scene.add_actors(self.actors(*args, **kwargs))
+
+        if not wait:
+            scene.play()
+
+    def actors(self, values=None, **kwargs):
+        try:
+            # to load as if given a key
+            values = self[values]
+        except KeyError:
+            # show error, but plot anyway (fail gracefully?)
+            if values:
+                traceback.print_exc()
+                values = None
+        except TypeError:
+            # probably an array, but make sure it fits!
+            assert np.array(values).shape[-1] == self.order
+        finally:
+            wires = graphics.Wires(self.points, self.pairs, values, **kwargs)
+        return [wires]
 
 
 class Cubic(Network):
