@@ -22,17 +22,19 @@ class Diffusion(Simulation):
     Crank-Nicholson method
     u ~ CFL number
     '''
-    def __init__(self, adj, u, insulated=None, T0=0):
+    def __init__(self, adj, u, insulated=False, T0=0):
         adjsum = adj.sum(axis=1).A1
-        if insulated is None:
-            adjsum = adjsum.max()
+        if insulated is True:
+            pass
+        elif insulated is False:
+            adjsum[:] = adjsum.max()
         else:
             adjsum[~insulated] = adjsum.max()
         self.RHS = -u*adj + sparse.diags(1+adjsum*u, 0)
         self.LHS =  u*adj + sparse.diags(1-adjsum*u, 0)
         self.history = [T0*np.ones_like(adjsum, dtype=float)]
 
-    def march(self, changes):
+    def march(self, changes=0):
         self.state = spsolve(self.RHS, self.LHS*self.state + changes)
 
 
