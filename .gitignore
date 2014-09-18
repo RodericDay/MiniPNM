@@ -7,3 +7,5 @@ minipnm.egg-info/
 scratch*
 examples/
 *.sublime*
+.coverage
+htmlcov/
