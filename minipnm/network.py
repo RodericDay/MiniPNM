@@ -360,6 +360,12 @@ class Radial(Network):
         self.spans, self.midpoints = geometry.cylinders(self.points, self['sphere_radii'], self.pairs)
         self.prune_colliding()
 
+    @property
+    def bbox(self):
+        minima = (self.coords - self['sphere_radii']).min(axis=1)
+        maxima = (self.coords + self['sphere_radii']).max(axis=1)
+        return maxima - minima
+
     def prune_colliding(self):
         for center, radius in zip(self.points, self['sphere_radii']):
             safe = ~geometry.intersecting(center, radius,
@@ -370,6 +376,23 @@ class Radial(Network):
             self.midpoints = self.midpoints[safe]
             self.spans = self.spans[safe]
             self['cylinder_radii'] = self['cylinder_radii'][safe]
+
+    def rasterize(self, resolution=20):
+        offset = (self.coords - self['sphere_radii']).min(axis=1)
+        scale = np.true_divide(self.bbox.max(), resolution-1)
+        dims = np.ceil(self.bbox/scale) + 1
+        im = np.zeros(dims)-1
+
+        raster = Cubic.from_source(im)
+        raster.points *= scale
+        raster.points += offset
+
+        for i, center in enumerate(self.points):
+            distance = np.linalg.norm(raster.points-center, axis=1)
+            equivalent = distance < self['sphere_radii'][i]
+            raster['source'][equivalent] = i
+
+        return raster
 
     def actors(self, saturation_history=None):
         shells = graphics.Spheres(self.points, self['sphere_radii'], color=(1,1,1), alpha=0.4)
