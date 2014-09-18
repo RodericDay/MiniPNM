@@ -45,3 +45,6 @@ def filtered_distances(network, _filter, default):
 
 distances_to_nearest_neighbors = lambda network: filtered_distances(network, min, 1E-6)
 distances_to_furthest_neighbors = lambda network: filtered_distances(network, max, np.inf)
+
+def match(p1, p2):
+    return [np.argmin(np.linalg.norm(p-p2, axis=1)) for p in p1]
