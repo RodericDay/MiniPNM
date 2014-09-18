@@ -309,6 +309,7 @@ class Cubic(Network):
         spacing = map(np.diff, map(np.unique, self.coords))
         min_spacing = [min(a) if len(a) else 1.0 for a in spacing]
         points = (self.points / min_spacing).astype(int)
+        points -= points.min(axis=0)
         bbox = (self.bbox / min_spacing + 1).astype(int)
         actual_indexes = np.ravel_multi_index(points.T, bbox)
         array = np.zeros(bbox)
