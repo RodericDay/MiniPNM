@@ -356,7 +356,7 @@ class Radial(Network):
             pairs = Delaunay.edges_from_points(self.points)
         self.pairs = np.array(pairs)
 
-        self['sphere_radii'] = np.array(radii)
+        self['sphere_radii'] = np.ones(self.order)*radii
         self['cylinder_radii'] = self['sphere_radii'][self.pairs].min(axis=1)/2.
         self.spans, self.midpoints = geometry.cylinders(self.points, self['sphere_radii'], self.pairs)
         self.prune_colliding()

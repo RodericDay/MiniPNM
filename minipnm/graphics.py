@@ -81,7 +81,7 @@ class Wires(Actor):
 
 class Spheres(Actor):
 
-    def __init__(self, centers, radii, alpha=1, color=(1,1,1)):
+    def __init__(self, centers, radii=1, alpha=1, color=(1,1,1)):
         self.polydata = vtk.vtkPolyData()
         self.set_points(centers)
 
@@ -96,7 +96,7 @@ class Spheres(Actor):
         self.mapper.SetInputConnection(self.glyph3D.GetOutputPort())
         self.SetMapper(self.mapper)
 
-        self.script = 2*np.atleast_2d(radii)
+        self.script = 2*np.atleast_2d(np.ones(len(centers)))*radii
 
         self.GetProperty().SetOpacity(alpha)
         r,g,b = color
