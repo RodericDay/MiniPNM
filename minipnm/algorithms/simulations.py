@@ -20,31 +20,29 @@ class Simulation(object):
 class Diffusion(Simulation):
     '''
     Crank-Nicholson method
+    cmat ~ conductance matrix
     u ~ CFL number
     '''
-    def __init__(self, adj, u, insulated=False, T0=0):
-        adjsum = adj.sum(axis=1).A1
+    def __init__(self, cmat, u, insulated=False, base=0):
+        self.cmat = cmat
+        adjsum = cmat.sum(axis=1).A1
         if insulated is True:
             pass
         elif insulated is False:
             adjsum[:] = adjsum.max()
         else:
             adjsum[~insulated] = adjsum.max()
-        self.RHS = -u*adj + sparse.diags(1+adjsum*u, 0)
-        self.LHS =  u*adj + sparse.diags(1-adjsum*u, 0)
-        self.history = [T0*np.ones_like(adjsum, dtype=float)]
+        self.RHS = -u*cmat + sparse.diags(1+adjsum*u, 0)
+        self.LHS =  u*cmat + sparse.diags(1-adjsum*u, 0)
+        self.history = [np.ones_like(adjsum, dtype=float) * base]
 
     def march(self, changes=0):
         self.state = spsolve(self.RHS, self.LHS*self.state + changes)
 
-
-class NeighborsSaturated(Exception):
-    msg = "All neighbors of node {} saturated. Network saturation: {}%"
-    def __init__(self, node, saturation):
-        self.node = node
-        self.saturation = saturation
-    def __str__(self):
-        return self.msg.format(self.node, self.saturation.mean()*100)
+    def render(self, points, scene, **kwargs):
+        pairs = np.vstack([self.cmat.col, self.cmat.row]).T
+        wires = graphics.Wires(points, pairs, self.history, **kwargs)
+        scene.add_actors([wires])
 
 
 class Invasion(Simulation):
@@ -52,6 +50,13 @@ class Invasion(Simulation):
     This class simulates alop invasion with fractional generation in arbitrary
     pores simultaneously
     '''
+    class NeighborsSaturated(Exception):
+        msg = "All neighbors of node {} saturated. Network saturation: {}%"
+        def __init__(self, node, saturation):
+            self.node = node
+            self.saturation = saturation
+        def __str__(self):
+            return self.msg.format(self.node, self.saturation.mean()*100)
 
     def __init__(self, capacities, conductance_matrix):
         self.capacities = capacities
@@ -64,11 +69,11 @@ class Invasion(Simulation):
         while True:
             try:
                 self.distribute(next(generator))
-            except NeighborsSaturated as e:
+            except self.NeighborsSaturated as e:
                 break
         return self.history
 
-    def distribute(self, generation):
+    def distribute(self, generation=0):
         content = self.capacities*self.saturation + generation
         excess = content.clip(self.capacities, content) - self.capacities
         content -= excess
@@ -77,7 +82,7 @@ class Invasion(Simulation):
             for node in excess.nonzero()[0]:
                 recipient = self.find_unsaturated_neighbor(node)
                 if node == recipient:
-                    raise NeighborsSaturated(node, self.saturation)
+                    raise self.NeighborsSaturated(node, self.saturation)
                 excess[recipient] += excess[node]
                 excess[node] = 0
             return self.distribute(excess)
@@ -121,7 +126,8 @@ class Invasion(Simulation):
     def render(self, points, scene):
         fill_radii = (self.capacities*self.history*3./4./np.pi)**(1./3.)
         balloons = graphics.Spheres(points, fill_radii, color=(0,0,1))
+        scene.add_actors([balloons])
 
         radii = (self.capacities*3./4./np.pi)**(1./3.)
         snowballs = graphics.Spheres(points, radii*self.block_history, alpha=0.75)
-        scene.add_actors([balloons, snowballs])
+        scene.add_actors([snowballs])
