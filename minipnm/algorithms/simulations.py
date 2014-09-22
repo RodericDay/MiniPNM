@@ -58,12 +58,12 @@ class Invasion(Simulation):
         def __str__(self):
             return self.msg.format(self.node, self.saturation.mean()*100)
 
-    def __init__(self, capacities, conductance_matrix):
+    def __init__(self, cmat, capacities):
+        self.cmat = cmat
         self.capacities = capacities
-        self.con = conductance_matrix
         self.saturation = np.zeros_like(capacities)
         self.history = [np.zeros_like(capacities)]
-        self.block_history = [np.zeros_like(capacities, dtype=bool)]
+        self.blocked = np.zeros_like(capacities, dtype=bool)
 
     def until_saturation(self, generator):
         while True:
@@ -82,24 +82,25 @@ class Invasion(Simulation):
             for node in excess.nonzero()[0]:
                 recipient = self.find_unsaturated_neighbor(node)
                 if node == recipient:
+                    self.history.append( self.saturation * np.where(self.blocked, -1, 1) )
                     raise self.NeighborsSaturated(node, self.saturation)
                 excess[recipient] += excess[node]
                 excess[node] = 0
             return self.distribute(excess)
-        self.history.append( self.saturation )
+        self.history.append( self.saturation * np.where(self.blocked, -1, 1) )
         return self.saturation
 
     def find_unsaturated_neighbor(self, node):
         self.update_pressurized_clusters()
-        full_sources = self.labels[self.con.col]==self.labels[node]
-        non_full_sinks = self.saturation[self.con.row] < 0.999
-        not_blocked = self.con.data > 0
+        full_sources = self.labels[self.cmat.col]==self.labels[node]
+        non_full_sinks = self.saturation[self.cmat.row] < 0.999
+        not_blocked = self.cmat.data > 0
         viable_throats = full_sources & non_full_sinks & not_blocked
         viable_throats = viable_throats.nonzero()[0] # bool -> idxs
         if len(viable_throats) == 0:
             return node
-        best_throat = max(viable_throats, key=self.con.data.item)
-        neighbor = self.con.row[best_throat]
+        best_throat = max(viable_throats, key=self.cmat.data.item)
+        neighbor = self.cmat.row[best_throat]
         return neighbor
 
     def update_pressurized_clusters(self):
@@ -108,26 +109,26 @@ class Invasion(Simulation):
         '''
         full_nodes = (self.saturation > 0.999).nonzero()[0]
         # superclusters require pressurized throats
-        pressurized_throats = np.in1d(self.con.row, full_nodes) \
-                            & np.in1d(self.con.col, full_nodes)
-        i = self.con.row[pressurized_throats]
-        j = self.con.col[pressurized_throats]
+        pressurized_throats = np.in1d(self.cmat.row, full_nodes) \
+                            & np.in1d(self.cmat.col, full_nodes)
+        i = self.cmat.row[pressurized_throats]
+        j = self.cmat.col[pressurized_throats]
         v = np.ones_like(i)
         s = self.capacities.size
         coo = sparse.coo_matrix((v, (i, j)), shape=(s,s))
         self.labels = sparse.csgraph.connected_components(coo)[1]
 
     def block(self, nodes):
-        self.block_history.append(self.block_history[-1] + nodes)
+        self.blocked = nodes
         indexes = nodes.nonzero()[0]
-        blocked = np.in1d(self.con.col, indexes)
-        self.con.data[blocked] = -1
+        disconnected = np.in1d(self.cmat.col, indexes)
+        self.cmat.data = np.abs(self.cmat.data) * np.where(disconnected, -1, 1)
 
     def render(self, points, scene):
-        fill_radii = (self.capacities*self.history*3./4./np.pi)**(1./3.)
-        balloons = graphics.Spheres(points, fill_radii, color=(0,0,1))
+        fill_radii = (self.capacities*np.abs(self.history)*3./4./np.pi)**(1./3.) * np.sign(self.history)
+
+        balloons = graphics.Spheres(points, np.where(fill_radii>0, fill_radii, 0), color=(0,0,1))
         scene.add_actors([balloons])
 
-        radii = (self.capacities*3./4./np.pi)**(1./3.)
-        snowballs = graphics.Spheres(points, radii*self.block_history, alpha=0.75)
+        snowballs = graphics.Spheres(points, np.where(fill_radii<0, -fill_radii, 0), color=(1,0,0))
         scene.add_actors([snowballs])
