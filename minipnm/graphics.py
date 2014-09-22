@@ -1,3 +1,4 @@
+from __future__ import print_function
 from tempfile import NamedTemporaryFile
 from subprocess import call
 import itertools as it
@@ -17,6 +18,7 @@ def bind(array):
     return array
 
 class Actor(vtk.vtkActor):
+    callable = print
 
     def __init__(self):
         raise NotImplementedError()
