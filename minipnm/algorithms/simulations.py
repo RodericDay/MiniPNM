@@ -48,7 +48,9 @@ class Diffusion(Simulation):
 class Invasion(Simulation):
     '''
     This class simulates alop invasion with fractional generation in arbitrary
-    pores simultaneously
+    pores simultaneously.
+
+    Negative saturation values are assumed to be frozen.
     '''
     class NeighborsSaturated(Exception):
         msg = "All neighbors of node {} saturated. Network saturation: {}%"
@@ -127,8 +129,8 @@ class Invasion(Simulation):
     def render(self, points, scene):
         fill_radii = (self.capacities*np.abs(self.history)*3./4./np.pi)**(1./3.) * np.sign(self.history)
 
-        balloons = graphics.Spheres(points, np.where(fill_radii>0, fill_radii, 0), color=(0,0,1))
+        balloons  = graphics.Spheres(points, fill_radii.clip( 0, np.inf), color=(0,0,1))
         scene.add_actors([balloons])
 
-        snowballs = graphics.Spheres(points, np.where(fill_radii<0, -fill_radii, 0), color=(1,0,0))
+        snowballs = graphics.Spheres(points,-fill_radii.clip(-np.inf, 0), color=(1,0,0))
         scene.add_actors([snowballs])
