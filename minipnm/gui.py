@@ -89,7 +89,7 @@ class GUI(QtGui.QMainWindow):
         else:
             x, y = a1, a2
         self.plotWidget.clear()
-        self.plotWidget.plot(x,y, symbol='o')
+        self.plotWidget.plot(x,y, symbol='o', symbolSize=3)
         self.timeLine = QtGraph.InfiniteLine(angle=90, movable=True)
         self.timeLine.setBounds((min(x), max(x)))
         self.timeLine.sigPositionChanged.connect(self.updateRenderWindow)
