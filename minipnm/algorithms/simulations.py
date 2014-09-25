@@ -6,49 +6,115 @@ from .. import graphics
 
 class Simulation(object):
     '''
-    Automates keeping track of an evolving history
+    The base simulation object is a utility class that performs some
+    boilerplate functions.
+
+    1) Keep track of a state history
+    2) Handle the sparse aspects of pore blocking and unblocking
     '''
+
+    def __init__(self, cmat, base=0):
+        self._cmat = cmat
+        n, m = cmat.shape
+        assert n==m
+        self.history = [base*np.ones(n)]
+
     @property
     def state(self):
         return self.history[-1].copy()
 
     @state.setter
-    def state(self, array):
-        self.history.append(array)
+    def state(self, entry):
+        self.history.append(entry)
+
+    def march(self):
+        self.state = self.state
+
+    def block(self, nodes=True):
+        '''
+        blocking turns history entries imaginary to indicate they are nulled,
+        while retaining the magnitude
+
+        True blocks all, None/False blocks None
+        '''
+        # numpy has weird defaults for slicing, so we hack it a little bit
+        # to adapt to our English intuition
+        if nodes is False or nodes is None: nodes=[] # select None
+        elif nodes is True: nodes=None # select All
+        indexes = np.arange(self.state.size)
+        subset = indexes[nodes]
+        mask = np.in1d(indexes, subset)
+        self.history[-1] = np.absolute(self.state) * np.where(mask, 1j, 1)
+
+    @property
+    def blocked(self):
+        return self.state.imag != 0
+
+    @property
+    def valid(self):
+        '''
+        return a boolean mask of valid connections by index
+        that is, connections where neither head nor sink is blocked
+        '''
+        accessible = (self.state.imag == 0).nonzero()[0]
+        good_tails = np.in1d(self._cmat.col, accessible)
+        good_heads = np.in1d(self._cmat.row, accessible)
+        return good_tails & good_heads
+
+    @property
+    def cmat(self):
+        '''
+        return a mask over the cmat s.t blocked (imaginary) nodes are isolated
+        '''
+        data = self._cmat.data[self.valid]
+        col = self._cmat.col[self.valid]
+        row = self._cmat.row[self.valid]
+        return sparse.coo_matrix((data, (col, row)), self._cmat.shape)
+
+    def render(self, points, scene, **kwargs):
+        pairs = np.vstack([self._cmat.col, self._cmat.row]).T
+        wires = graphics.Wires(points, pairs, np.absolute(self.history), **kwargs)
+        scene.add_actors([wires])
+
+    def __str__(self):
+        return str(np.vstack(self.history).real)
 
 
 class Diffusion(Simulation):
     '''
-    Crank-Nicholson method
-    cmat ~ conductance matrix
-    u ~ CFL number
+    Using Crank-Nicholson discretized in time and space
     '''
-    def __init__(self, cmat, u, insulated=False, base=0):
-        self.cmat = cmat
-        adjsum = cmat.sum(axis=1).A1
-        if insulated is True:
+
+    def __init__(self, cmat, nCFL=1, insulated=False, base=0):
+        super(Diffusion, self).__init__(cmat, base)
+        self.insulated = insulated
+        self.nCFL = nCFL
+        self.build()
+
+    def block(self, nodes):
+        super(Diffusion, self).block(nodes)
+        self.build()
+
+    def build(self):
+        csum = self.cmat.sum(axis=1).A1
+        if self.insulated is True:
             pass
-        elif insulated is False:
-            adjsum[:] = adjsum.max()
+        elif self.insulated is False:
+            csum[:] = csum.max()
         else:
-            adjsum[~insulated] = adjsum.max()
-        self.RHS = -u*cmat + sparse.diags(1+adjsum*u, 0)
-        self.LHS =  u*cmat + sparse.diags(1-adjsum*u, 0)
-        self.history = [np.ones_like(adjsum, dtype=float) * base]
+            csum[~self.insulated] == csum.max()
+        u = self.nCFL
+        self.RHS = -u*self.cmat + sparse.diags(1+u*csum, 0)
+        self.LHS =  u*self.cmat + sparse.diags(1-u*csum, 0)
 
-    def march(self, changes=0):
-        self.state = spsolve(self.RHS, self.LHS*self.state + changes)
-
-    def render(self, points, scene, **kwargs):
-        pairs = np.vstack([self.cmat.col, self.cmat.row]).T
-        wires = graphics.Wires(points, pairs, self.history, **kwargs)
-        scene.add_actors([wires])
+    def march(self, inputs=0):
+        x = spsolve(self.RHS, self.LHS*self.state.real + inputs)
+        self.state = np.where(self.blocked, self.state, x)
 
 
-class Invasion(Simulation):
+class Invasion(object):
     '''
-    This class simulates alop invasion with fractional generation in arbitrary
-    pores simultaneously.
+    ALOP simulatneous invasion with fractional generation.
 
     Negative saturation values are assumed to be frozen.
     '''
@@ -66,6 +132,10 @@ class Invasion(Simulation):
         self.saturation = np.zeros_like(capacities)
         self.history = [np.zeros_like(capacities)]
         self.blocked = np.zeros_like(capacities, dtype=bool)
+
+    @property
+    def state(self):
+        return self.history[-1].copy()
 
     def until_saturation(self, generator):
         while True:
