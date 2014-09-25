@@ -73,7 +73,7 @@ class Simulation(object):
 
     def render(self, points, scene, **kwargs):
         pairs = np.vstack([self._cmat.col, self._cmat.row]).T
-        wires = graphics.Wires(points, pairs, np.absolute(self.history), **kwargs)
+        wires = graphics.Wires(points, pairs, np.real(self.history), **kwargs)
         scene.add_actors([wires])
 
     def __str__(self):
@@ -163,21 +163,24 @@ class Invasion(object):
         return self.saturation
 
     def find_unsaturated_neighbor(self, node):
-        self.update_pressurized_clusters()
-        full_sources = self.labels[self.cmat.col]==self.labels[node]
-        non_full_sinks = self.saturation[self.cmat.row] < 0.999
-        not_blocked = self.cmat.data > 0
-        viable_throats = full_sources & non_full_sinks & not_blocked
-        viable_throats = viable_throats.nonzero()[0] # bool -> idxs
+        viable_throats = self.find_frontier_throats(node)
         if len(viable_throats) == 0:
             return node
         best_throat = max(viable_throats, key=self.cmat.data.item)
         neighbor = self.cmat.row[best_throat]
         return neighbor
 
+    def find_frontier_throats(self, node):
+        self.update_pressurized_clusters()
+        full_sources = self.labels[self.cmat.col]==self.labels[node]
+        non_full_sinks = self.saturation[self.cmat.row] < 0.999
+        not_blocked = self.cmat.data > 0
+        viable_throats = full_sources & non_full_sinks & not_blocked
+        return viable_throats.nonzero()[0]
+
     def update_pressurized_clusters(self):
         '''
-        this only needs to be checked when pores are newly saturated
+        this only needs to be run when pores are newly saturated
         '''
         full_nodes = (self.saturation > 0.999).nonzero()[0]
         # superclusters require pressurized throats
