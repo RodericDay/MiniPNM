@@ -12,26 +12,29 @@ source = network.indexes==0
 gas = mini.simulations.Diffusion(cmat, insulated=True)
 water = mini.simulations.Invasion(cmat, capacities)
 
-# fill up a random amount
-for t in range(100):
-    gas.march(source)
-    try: water.distribute(0.2*source)
-    except water.NeighborsSaturated: break
+def sim():
+    # fill up a random amount
+    for t in range(100):
+        gas.march(source)
+        try: water.distribute(0.2*source)
+        except water.NeighborsSaturated: break
 
-# freeze everything at the frontier
-frontiers = cmat.col[water.find_frontier_throats(0)]
-targets = np.in1d(network.indexes, frontiers)
-water.block(targets)
-gas.block(targets)
+    # freeze everything at the frontier
+    frontiers = water.cmat.col[water.find_frontier_throats(0)]
+    targets = np.in1d(network.indexes, frontiers)
+    water.block(targets)
+    gas.block(targets)
 
-# continue
-for t in range(100):
-    gas.march(source)
-    water.distribute()
+    # continue
+    for t in range(100):
+        gas.march(source)
+        water.distribute()
+sim()
 
 gui = mini.GUI()
 scene = gui.scene
-network.render(source, scene=scene)
+network.render(scene=scene)
 water.render(network.points, scene=scene)
-gas.render(network.points+[0,-10,0], scene=scene)
+gas.render(network.points+[10,0,0], scene=scene)
+gui.plot(gas.history.mean(axis=1))
 gui.run()

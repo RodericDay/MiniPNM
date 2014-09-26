@@ -10,53 +10,87 @@ class Simulation(object):
     boilerplate functions.
 
     1) Keep track of a state history
-    2) Handle the sparse aspects of pore blocking and unblocking
+    2) Handle the sparsity aspects of pore blocking and unblocking
     '''
+    class BlockedStateChange(Exception):
+        msg = "Unblock nodes before attempting state change."
+        def __str__(self):
+            return self.msg
+
 
     def __init__(self, cmat, base=0):
+        m, n = cmat.shape
+        assert m==n
         self._cmat = cmat
-        n, m = cmat.shape
-        assert n==m
-        self.history = [base*np.ones(n)]
+        self.state_history = [base*np.ones(n)]
+        self.block_history = {}
+        self.block(None)
+
+    @property
+    def indexes(self):
+        return np.arange(self.state.size)
 
     @property
     def state(self):
-        return self.history[-1].copy()
+        return self.state_history[-1].copy()
 
     @state.setter
     def state(self, entry):
-        self.history.append(entry)
+        diff = self.state - entry
+        if not np.allclose(diff[self.blocked], 0):
+            raise self.BlockedStateChange()
+        self.state_history.append(entry)
 
-    def march(self):
-        self.state = self.state
-
-    def block(self, nodes=True):
+    @property
+    def step(self):
         '''
-        blocking turns history entries imaginary to indicate they are nulled,
-        while retaining the magnitude
-
-        True blocks all, None/False blocks None
+        returns relative simulation 'step' for internal counting methods
         '''
-        # numpy has weird defaults for slicing, so we hack it a little bit
-        # to adapt to our English intuition
-        if nodes is False or nodes is None: nodes=[] # select None
-        elif nodes is True: nodes=None # select All
-        indexes = np.arange(self.state.size)
-        subset = indexes[nodes]
-        mask = np.in1d(indexes, subset)
-        self.history[-1] = np.absolute(self.state) * np.where(mask, 1j, 1)
+        return len(self.state_history)-1
+
+    @property
+    def history(self):
+        '''
+        returns the state history. made into a property to encourage more
+        sophisticated simulations to return arrays that take more into
+        account
+        '''
+        return np.vstack(self.state_history)
+
+    def block(self, targets=True):
+        '''
+        special options for target argument:
+            True  : blocks all
+            None  : blocks none
+            False : blocks none
+        '''
+        if targets is False or targets is None: targets=[] # selects None
+        elif targets is True: targets=None # selects All
+        else: pass # assumes targets contains indexes
+        subset = self.indexes[targets]
+        self.block_history[self.step] = np.in1d(self.indexes, subset)
 
     @property
     def blocked(self):
-        return self.state.imag != 0
+        return self.block_history[max(self.block_history.keys())]
+
+    def expand_block_states(self):
+        '''
+        the block history is stored in dictionary form
+        this convenience function provides it in an array form that matches
+        the state history
+        '''
+        bins = np.array(sorted(self.block_history.keys()))
+        return np.array([self.block_history[step] for step in 
+                bins[np.digitize(range(len(self.history)), bins)-1]])
 
     @property
-    def valid(self):
+    def valid_edges(self):
         '''
-        return a boolean mask of valid connections by index
-        that is, connections where neither head nor sink is blocked
+        return a boolean mask of valid edges, which are
+        edges where neither head nor tail is blocked
         '''
-        accessible = (self.state.imag == 0).nonzero()[0]
+        accessible = (~self.blocked).nonzero()[0]
         good_tails = np.in1d(self._cmat.col, accessible)
         good_heads = np.in1d(self._cmat.row, accessible)
         return good_tails & good_heads
@@ -64,20 +98,18 @@ class Simulation(object):
     @property
     def cmat(self):
         '''
-        return a mask over the cmat s.t blocked (imaginary) nodes are isolated
+        returns a transformed conductance matrix without
+        connections from or to blocked pores
         '''
-        data = self._cmat.data[self.valid]
-        col = self._cmat.col[self.valid]
-        row = self._cmat.row[self.valid]
-        return sparse.coo_matrix((data, (col, row)), self._cmat.shape)
+        data = self._cmat.data[self.valid_edges]
+        col = self._cmat.col[self.valid_edges]
+        row = self._cmat.row[self.valid_edges]
+        return sparse.coo_matrix((data, (row, col)), self._cmat.shape)
 
-    def render(self, points, scene, **kwargs):
+    def render(self, points, scene=None, **kwargs):
         pairs = np.vstack([self._cmat.col, self._cmat.row]).T
-        wires = graphics.Wires(points, pairs, np.real(self.history), **kwargs)
+        wires = graphics.Wires(points, pairs, self.history, **kwargs)
         scene.add_actors([wires])
-
-    def __str__(self):
-        return str(np.vstack(self.history).real)
 
 
 class Diffusion(Simulation):
@@ -85,10 +117,10 @@ class Diffusion(Simulation):
     Using Crank-Nicholson discretized in time and space
     '''
 
-    def __init__(self, cmat, nCFL=1, insulated=False, base=0):
-        super(Diffusion, self).__init__(cmat, base)
+    def __init__(self, cmat, nCFL=1, insulated=True, base=0):
         self.insulated = insulated
         self.nCFL = nCFL
+        super(Diffusion, self).__init__(cmat, base)
         self.build()
 
     def block(self, nodes):
@@ -100,6 +132,7 @@ class Diffusion(Simulation):
         if self.insulated is True:
             pass
         elif self.insulated is False:
+            # this makes a bad assumption about the regularity of the grid
             csum[:] = csum.max()
         else:
             csum[~self.insulated] == csum.max()
@@ -112,11 +145,9 @@ class Diffusion(Simulation):
         self.state = np.where(self.blocked, self.state, x)
 
 
-class Invasion(object):
+class Invasion(Simulation):
     '''
     ALOP simulatneous invasion with fractional generation.
-
-    Negative saturation values are assumed to be frozen.
     '''
     class NeighborsSaturated(Exception):
         msg = "All neighbors of node {} saturated. Network saturation: {}%"
@@ -126,24 +157,11 @@ class Invasion(object):
         def __str__(self):
             return self.msg.format(self.node, self.saturation.mean()*100)
 
+
     def __init__(self, cmat, capacities):
-        self.cmat = cmat
+        super(Invasion, self).__init__(cmat)
         self.capacities = capacities
-        self.saturation = np.zeros_like(capacities)
-        self.history = [np.zeros_like(capacities)]
-        self.blocked = np.zeros_like(capacities, dtype=bool)
-
-    @property
-    def state(self):
-        return self.history[-1].copy()
-
-    def until_saturation(self, generator):
-        while True:
-            try:
-                self.distribute(next(generator))
-            except self.NeighborsSaturated as e:
-                break
-        return self.history
+        self.saturation = self.state
 
     def distribute(self, generation=0):
         content = self.capacities*self.saturation + generation
@@ -153,19 +171,17 @@ class Invasion(object):
         if any(excess):
             for node in excess.nonzero()[0]:
                 recipient = self.find_unsaturated_neighbor(node)
-                if node == recipient:
-                    self.history.append( self.saturation * np.where(self.blocked, -1, 1) )
-                    raise self.NeighborsSaturated(node, self.saturation)
                 excess[recipient] += excess[node]
                 excess[node] = 0
             return self.distribute(excess)
-        self.history.append( self.saturation * np.where(self.blocked, -1, 1) )
+        self.state = self.saturation
         return self.saturation
 
     def find_unsaturated_neighbor(self, node):
         viable_throats = self.find_frontier_throats(node)
         if len(viable_throats) == 0:
-            return node
+            self.state = self.saturation
+            raise self.NeighborsSaturated(node, self.saturation)
         best_throat = max(viable_throats, key=self.cmat.data.item)
         neighbor = self.cmat.row[best_throat]
         return neighbor
@@ -174,8 +190,7 @@ class Invasion(object):
         self.update_pressurized_clusters()
         full_sources = self.labels[self.cmat.col]==self.labels[node]
         non_full_sinks = self.saturation[self.cmat.row] < 0.999
-        not_blocked = self.cmat.data > 0
-        viable_throats = full_sources & non_full_sinks & not_blocked
+        viable_throats = full_sources & non_full_sinks
         return viable_throats.nonzero()[0]
 
     def update_pressurized_clusters(self):
@@ -193,17 +208,14 @@ class Invasion(object):
         coo = sparse.coo_matrix((v, (i, j)), shape=(s,s))
         self.labels = sparse.csgraph.connected_components(coo)[1]
 
-    def block(self, nodes):
-        self.blocked = nodes
-        indexes = nodes.nonzero()[0]
-        disconnected = np.in1d(self.cmat.col, indexes)
-        self.cmat.data = np.abs(self.cmat.data) * np.where(disconnected, -1, 1)
-
     def render(self, points, scene):
-        fill_radii = (self.capacities*np.abs(self.history)*3./4./np.pi)**(1./3.) * np.sign(self.history)
-
-        balloons  = graphics.Spheres(points, fill_radii.clip( 0, np.inf), color=(0,0,1))
+        balloons  = graphics.Spheres(points, self._radii(self.history), color=(0,0,1))
         scene.add_actors([balloons])
 
-        snowballs = graphics.Spheres(points,-fill_radii.clip(-np.inf, 0), color=(1,0,0))
+        block_states = self.expand_block_states()
+        snowballs = graphics.Spheres(points, self._radii(block_states), color=(1,0,0))
         scene.add_actors([snowballs])
+
+    def _radii(self, saturation=1):
+        return (self.capacities*saturation/np.pi*3./4.)**(1./3.)
+
