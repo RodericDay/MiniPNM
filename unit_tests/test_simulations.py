@@ -27,7 +27,6 @@ def test_base_blocked_change():
         sim.state = sim.indexes
 
 def test_diffusion():
-    assert dif.insulated is True
     for t in range(9):
         dif.march(sources)
     np.testing.assert_almost_equal(dif.history.sum(axis=1), np.arange(10))

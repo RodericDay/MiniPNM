@@ -114,12 +114,12 @@ class Simulation(object):
 
 class Diffusion(Simulation):
     '''
-    Using Crank-Nicholson discretized in time and space
+    Using Crank-Nicholson discretized in time and something else in space
     '''
 
-    def __init__(self, cmat, nCFL=1, insulated=True, base=0):
-        self.insulated = insulated
+    def __init__(self, cmat, nCFL=1, base=0, dbcs=None):
         self.nCFL = nCFL
+        self.dbcs = {} if dbcs is None else dbcs
         super(Diffusion, self).__init__(cmat, base)
 
     def block(self, nodes):
@@ -128,20 +128,16 @@ class Diffusion(Simulation):
 
     def build(self):
         csum = self.cmat.sum(axis=1).A1
-        if self.insulated is True:
-            pass
-        elif self.insulated is False:
-            # this makes a bad assumption about the regularity of the grid
-            csum[:] = csum.max()
-        else:
-            csum[~self.insulated] = csum.max()
         u = self.nCFL
         self.RHS = -u*self.cmat + sparse.diags(1+u*csum, 0)
         self.LHS =  u*self.cmat + sparse.diags(1-u*csum, 0)
 
     def march(self, inputs=0):
-        x = spsolve(self.RHS, self.LHS*self.state.real + inputs)
-        self.state = np.where(self.blocked, self.state, x)
+        losses = sum((T-self.state)*b for T, b in self.dbcs.items())
+        A = self.RHS
+        b = self.LHS*self.state + inputs + losses
+        x = spsolve(A, b)
+        self.state = np.where(self.blocked, self.state, x) # dubious
 
 
 class Invasion(Simulation):
