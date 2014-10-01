@@ -121,7 +121,6 @@ class Diffusion(Simulation):
         self.insulated = insulated
         self.nCFL = nCFL
         super(Diffusion, self).__init__(cmat, base)
-        self.build()
 
     def block(self, nodes):
         super(Diffusion, self).block(nodes)
@@ -135,7 +134,7 @@ class Diffusion(Simulation):
             # this makes a bad assumption about the regularity of the grid
             csum[:] = csum.max()
         else:
-            csum[~self.insulated] == csum.max()
+            csum[~self.insulated] = csum.max()
         u = self.nCFL
         self.RHS = -u*self.cmat + sparse.diags(1+u*csum, 0)
         self.LHS =  u*self.cmat + sparse.diags(1-u*csum, 0)
