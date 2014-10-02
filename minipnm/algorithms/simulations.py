@@ -69,6 +69,7 @@ class Simulation(object):
         else: pass # assumes targets contains indexes
         subset = self.indexes[targets]
         self.block_history[self.step] = np.in1d(self.indexes, subset)
+        self._filtered_cmat = None # set to None to force update
 
     @property
     def blocked(self):
@@ -84,7 +85,6 @@ class Simulation(object):
         return np.array([self.block_history[step] for step in 
                 bins[np.digitize(range(len(self.history)), bins)-1]])
 
-    @property
     def valid_edges(self):
         '''
         return a boolean mask of valid edges, which are
@@ -101,10 +101,14 @@ class Simulation(object):
         returns a transformed conductance matrix without
         connections from or to blocked pores
         '''
-        data = self._cmat.data[self.valid_edges]
-        col = self._cmat.col[self.valid_edges]
-        row = self._cmat.row[self.valid_edges]
-        return sparse.coo_matrix((data, (row, col)), self._cmat.shape)
+        if self._filtered_cmat is None:
+            value_filter = self.valid_edges()
+            data = self._cmat.data[value_filter]
+            col = self._cmat.col[value_filter]
+            row = self._cmat.row[value_filter]
+            shape = self._cmat.shape
+            self._filtered_cmat = sparse.coo_matrix((data, (row, col)), shape)
+        return self._filtered_cmat
 
     def render(self, points, scene=None, **kwargs):
         pairs = np.vstack([self._cmat.col, self._cmat.row]).T
