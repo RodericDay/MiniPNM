@@ -1,3 +1,4 @@
+import os
 import numpy as np
 
 '''
@@ -52,3 +53,17 @@ def property_from(list_of_keys, dtype=None, default=None):
             del self[key]
 
     return property(getter, setter)
+
+
+def save(network):
+    fname = "{}.npz".format(network.__class__.__name__)
+    with open(fname, 'w') as f:
+        np.savez(f, **network)
+
+def load(path):
+    clsname = os.path.splitext(os.path.basename(path))[0]
+    cls = getattr(__import__('minipnm'), clsname)
+    network = cls.__new__(cls)
+    npzfile = np.load(path)
+    network.update(npzfile)
+    return network

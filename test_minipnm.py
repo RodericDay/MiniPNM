@@ -77,6 +77,15 @@ def test_lengths():
     for i in [i for i, c in np.ndenumerate(im) if np.linalg.norm(np.subtract(i, N/2-0.5))>N/2.5]:
         im[i] = 0
 
+def test_save_and_load():
+    original = mini.Cubic([20,20,20])
+    mini.save(original)
+    copy = mini.load('Cubic.npz')
+    assert type(original) is type(copy)
+    for key, value in original.items():
+        np.testing.assert_allclose(copy[key], value)
+    os.system("rm Cubic.npz")
+
 
 if __name__ == '__main__':
     errors = pytest.main()
