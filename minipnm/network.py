@@ -180,11 +180,19 @@ class Network(dict):
             return tails[valid], heads[valid]
 
     def prune(self, inaccessible, remove_pores=True):
+        '''
+        the update calls have some probability of messing things up if the
+        network.order somehow ends up being equal to the network.size
+        '''
+        old_order, old_size, old_keys = self.order, self.size, self.keys()
+
         accessible = self.indexes[~inaccessible.flatten()]
         good_heads = np.in1d(self['heads'], accessible)
         good_tails = np.in1d(self['tails'], accessible)
+        valid = good_heads & good_tails
         if len(self.pairs) > 0:
-            self.pairs = self.pairs[good_heads & good_tails]
+            self.pairs = self.pairs[valid]
+        self.update({key:array[valid] for key,array in self.data() if array.size==old_size})
         if not remove_pores:
             return
 
@@ -197,11 +205,11 @@ class Network(dict):
             mapping = np.zeros(inaccessible.size, dtype=int)
             mapping[accessible] = self.indexes
             self.pairs = np.vstack([mapping[hs], mapping[ts]]).T
-        for key, array in self.data():
-            if array.size == inaccessible.size:
-                self[key] = array[accessible]
-            else:
-                warnings.warn("{} entry mismatch- not ported".format(key))
+        self.update({key:array[accessible] for key,array in self.data() if array.size==old_order})
+
+        left_out = set(self.keys()) ^ set(old_keys)
+        if any(left_out):
+            warnings.warn("{}".format(left_out)) # make more verbose
 
     def copy(self):
         clone = self.__class__.__new__(self.__class__)
