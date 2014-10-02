@@ -138,7 +138,7 @@ class Diffusion(Simulation):
 
     def march(self, inputs=0):
         losses = sum((T-self.state)*b for T, b in self.dbcs.items())
-        A = self.RHS
+        A = self.RHS.astype(float)
         b = self.LHS*self.state + inputs + losses
         x = spsolve(A, b)
         self.state = np.where(self.blocked, self.state, x) # dubious
@@ -167,6 +167,7 @@ class Invasion(Simulation):
         excess = content.clip(self.capacities, content) - self.capacities
         content -= excess
         self.saturation = content / self.capacities
+        excess = self.pool(excess)
         if any(excess):
             for node in excess.nonzero()[0]:
                 recipient = self.find_unsaturated_neighbor(node)
@@ -175,6 +176,28 @@ class Invasion(Simulation):
             return self.distribute(excess)
         self.state = self.saturation
         return self.saturation
+
+    def pool(self, excess):
+        '''
+        consider that a single pore infused with the volumetric capacity of
+        the entire network will sucessively spillover until it fills the whole
+        thing. there's nothing to be done in this scenario.
+
+        however, when multiple pores have excess production, we can improve on
+        the performance. to avoid unnecessary calls to intensive methods, we 
+        ensure that all the excesses are concentrated in a single pore within
+        its cluster.
+
+        can this method be cheap, though?
+        '''
+        try:
+            labels = np.atleast_2d(self.labels)
+            boolstack = labels.repeat(np.unique(self.labels).size, axis=0)
+            print (boolstack==labels.T)
+            exit()
+        except AttributeError:
+            pass
+        return excess
 
     def find_unsaturated_neighbor(self, node):
         viable_throats = self.find_frontier_throats(node)
