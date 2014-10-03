@@ -1,4 +1,4 @@
-import random
+import random, copy
 import pytest
 import numpy as np
 import minipnm as mini

@@ -159,15 +159,17 @@ class Invasion(Simulation):
 
     def __init__(self, cmat, capacities):
         super(Invasion, self).__init__(cmat)
-        self.capacities = capacities
+        self.capacities = np.ones_like(self.state) * capacities
         self.saturation = self.state
+        self.update_pressurized_clusters()
 
     def distribute(self, generation=0):
         content = self.capacities*self.saturation + generation
         excess = content.clip(self.capacities, content) - self.capacities
         content -= excess
         self.saturation = content / self.capacities
-        excess = self.pool(excess)
+        self.update_pressurized_clusters()
+        excess = self.pool(excess, self.labels)
         if any(excess):
             for node in excess.nonzero()[0]:
                 recipient = self.find_unsaturated_neighbor(node)
@@ -177,27 +179,37 @@ class Invasion(Simulation):
         self.state = self.saturation
         return self.saturation
 
-    def pool(self, excess):
+    @staticmethod
+    def pool(excess, labels):
         '''
         consider that a single pore infused with the volumetric capacity of
         the entire network will sucessively spillover until it fills the whole
-        thing. there's nothing to be done in this scenario.
+        thing. This behaviour cannot be improved upon.
 
-        however, when multiple pores have excess production, we can improve on
-        the performance. to avoid unnecessary calls to intensive methods, we 
-        ensure that all the excesses are concentrated in a single pore within
-        its cluster.
+        However, when multiple pores have excess production in the same time
+        step, we can curtail unnecessary calls to intensive methods, by
+        ensuring that all the excesses are concentrated in a single pore within
+        every cluster. The spillover of a cluster is the sum of every spillover
+        of its individual pores.
 
-        can this method be cheap, though?
+        The pool method "lumps" scalars based on provided labeling. Numpy 2.0
+        will introduce a `find` function for arrays, which should improve upon
+        the slow python list loop.
+
+        >>> Invasion.pool([0.1, 0.1, 0.1, 0.1, 0.1], [0, 0, 0, 1, 1])
+        array([ 0.3,  0. ,  0. ,  0.2,  0. ])
         '''
-        try:
-            labels = np.atleast_2d(self.labels)
-            boolstack = labels.repeat(np.unique(self.labels).size, axis=0)
-            print (boolstack==labels.T)
-            exit()
-        except AttributeError:
-            pass
-        return excess
+        vals = np.array(excess)
+        idxs = np.arange(vals.size)
+        mask = np.array(labels)
+        ijv = (vals, (idxs, mask))
+
+        binned = sparse.coo_matrix(ijv).sum(axis=0).A1
+        lst = mask.tolist()
+        vals *= 0
+        for i,v in enumerate(binned):
+            vals[lst.index(i)] = v
+        return vals
 
     def find_unsaturated_neighbor(self, node):
         viable_throats = self.find_frontier_throats(node)
@@ -209,7 +221,6 @@ class Invasion(Simulation):
         return neighbor
 
     def find_frontier_throats(self, node):
-        self.update_pressurized_clusters()
         full_sources = self.labels[self.cmat.col]==self.labels[node]
         non_full_sinks = self.saturation[self.cmat.row] < 0.999
         viable_throats = full_sources & non_full_sinks
@@ -240,4 +251,3 @@ class Invasion(Simulation):
 
     def _radii(self, saturation=1):
         return (self.capacities*saturation/np.pi*3./4.)**(1./3.)
-
