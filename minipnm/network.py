@@ -358,16 +358,18 @@ class Radial(Network):
     spans = utils.property_from(['cylinder_length_x','cylinder_length_y','cylinder_length_z'])
     midpoints = utils.property_from(['cylinder_center_x','cylinder_center_y','cylinder_center_z'])
 
-    def __init__(self, centers, radii, pairs=None):
+    def __init__(self, centers, radii, pairs=None, prune=True, f=2):
         self.points = np.array(centers)
         if pairs is None:
             pairs = Delaunay.edges_from_points(self.points)
         self.pairs = np.array(pairs)
 
-        self['sphere_radii'] = np.ones(self.order)*radii
-        self['cylinder_radii'] = self['sphere_radii'][self.pairs].min(axis=1)/2.
+        self['sphere_radii'] = np.ones(self.order, dtype=float)*radii
+        self['cylinder_radii'] = self['sphere_radii'][self.pairs].min(axis=1)/f
         self.spans, self.midpoints = geometry.cylinders(self.points, self['sphere_radii'], self.pairs)
-        self.prune_colliding()
+
+        if prune:
+            self.prune_colliding()
 
     @property
     def bbox(self):
@@ -413,3 +415,11 @@ class Radial(Network):
         fill_radii = (capacity * saturation_history * 3./4. / np.pi)**(1./3.)
         history = graphics.Spheres(self.points, fill_radii, color=(0,0,1))
         return [shells, tubes, history]
+
+    def porosity(self):
+        box = np.prod(self.bbox)
+        spheres = (self['sphere_radii']**3 * 4./3. * np.pi)
+        lengths = np.linalg.norm(self.spans, axis=1)
+        lengths/= 2 # account for duplicity
+        circles = self['cylinder_radii']**2 * np.pi
+        return (spheres.sum() + (lengths*circles).sum()) / box

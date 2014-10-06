@@ -129,7 +129,7 @@ class Tubes(Actor):
         self.tubeFilter.SetInput(self.polydata)
         self.tubeFilter.SetVaryRadiusToVaryRadiusByAbsoluteScalar()
         self.tubeFilter.SetNumberOfSides(10)
-        self.tubeFilter.CappingOn()
+        # self.tubeFilter.CappingOn()
 
         self.mapper = vtk.vtkPolyDataMapper()
         self.mapper.SetInputConnection(self.tubeFilter.GetOutputPort())
