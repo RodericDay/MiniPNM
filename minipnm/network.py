@@ -363,10 +363,10 @@ class Radial(Network):
     midpoints = utils.property_from(['cylinder_center_x','cylinder_center_y','cylinder_center_z'])
 
     def __init__(self, centers, radii, pairs=None, prune=True, f=2):
-        self.points = np.array(centers)
+        self.points = np.array(centers, dtype=float)
         if pairs is None:
             pairs = Delaunay.edges_from_points(self.points)
-        self.pairs = np.array(pairs)
+        self.pairs = np.atleast_2d(pairs)
 
         self['sphere_radii'] = np.ones(self.order, dtype=float)*radii
         self['cylinder_radii'] = self['sphere_radii'][self.pairs].min(axis=1)/f

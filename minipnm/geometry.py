@@ -21,7 +21,7 @@ def cylinders(centers, radii, pairs=None):
         centers = centers[pairs]
         radii = radii[pairs]
 
-    spans = np.diff(centers, axis=1).squeeze()
+    spans = np.diff(centers, axis=1).reshape(-1,3)
     midpoints = centers[ :, 0, :] + spans/2.
     unit = (spans.T / np.linalg.norm(spans, axis=1)).T
     # shave endpoints
