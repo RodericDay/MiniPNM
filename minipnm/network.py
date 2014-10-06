@@ -37,6 +37,12 @@ class Network(dict):
     pairs = utils.property_from(['tails','heads'], dtype=int, default=[])
     filename = None
 
+    @classmethod
+    def load(cls, dict_):
+        inst = cls.__new__(cls)
+        inst.update(dict_)
+        return inst
+
     @property
     def order(self):
         return len(self.points)
@@ -212,9 +218,7 @@ class Network(dict):
             warnings.warn("{}".format(left_out)) # make more verbose
 
     def copy(self):
-        clone = self.__class__.__new__(self.__class__)
-        clone.update(self)
-        return clone
+        return self.load(self)
 
     def split(self, mask):
         subnetwork_1 = self - mask

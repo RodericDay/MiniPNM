@@ -86,6 +86,14 @@ def test_save_and_load():
         np.testing.assert_allclose(copy[key], value)
     os.system("rm Cubic.npz")
 
+def test_clone():
+    original = mini.Cubic([5,5,5])
+    copy = original.copy()
+    assert type(original) is type(copy)
+    unmatched = set(original.keys()) ^ set(copy.keys())
+    assert not unmatched
+    for key, value in original.items():
+        np.testing.assert_allclose(value, copy[key])
 
 if __name__ == '__main__':
     errors = pytest.main()
