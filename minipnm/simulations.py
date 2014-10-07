@@ -1,7 +1,7 @@
 import numpy as np
 from scipy import sparse
 from scipy.sparse.linalg import spsolve
-from .. import graphics
+from . import graphics
 
 
 class Simulation(object):
