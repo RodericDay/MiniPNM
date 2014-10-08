@@ -118,7 +118,13 @@ class Simulation(object):
 
 class Diffusion(Simulation):
     '''
-    Using Crank-Nicholson discretized in time and something else in space
+    Convection-diffusion equation
+
+    State refers to molar concentration when doing mass diffusion,
+    Temperature when doing heat diffusion
+
+    Discretized by a weird extrapolation of the regular stencil in space,
+    and Crank-Nicholson in time
     '''
 
     def __init__(self, cmat, nCFL=1, base=0, dbcs=None):
