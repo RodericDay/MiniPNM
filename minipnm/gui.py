@@ -42,10 +42,11 @@ class GUI(QtGui.QMainWindow):
     def __init__(self, parent=None):
         self.app = QtGui.QApplication([])
         QtGui.QMainWindow.__init__(self, parent)
+        self.move(200,200)
 
         self.initToolBar()
         self.initVtk() # the show command is called here, before vtk initialize
-        self.initPlot()
+        # timeline gets init at runtime
         # self.initTree()
         self.statusBar().showMessage("Ready")
 
@@ -56,21 +57,27 @@ class GUI(QtGui.QMainWindow):
     def initVtk(self):
         self.frame = QtGui.QFrame()
         self.vtkWidget = QVTKRenderWindowInteractor(parent=self.frame)
-
         self.vl = QtGui.QVBoxLayout()
         self.vl.addWidget(self.vtkWidget)
-
         self.scene = Scene(self.vtkWidget)
-
         self.frame.setLayout(self.vl)
         self.setCentralWidget(self.frame)
 
-    def initPlot(self):
-        self.plotWidget = QtGraph.PlotWidget(self)
-        self.plotWidget.setMouseEnabled(False, False)
-        self.plotDockWidget = QtGui.QDockWidget("Plot", self)
+    def initTimeline(self):
+        '''
+        needs to be modified if timestep will not be uniform
+        '''
+        frameRange = (0, len(self.scene)-1)
+        self.timeLine = QtGraph.InfiniteLine(angle=90, movable=True)
+        self.timeLine.setBounds(frameRange)
+        self.timeLine.sigPositionChanged.connect(self.updateRenderWindow)
+        self.timeWidget = QtGraph.PlotWidget(self)
+        self.timeWidget.addItem(self.timeLine)
+        self.timeWidget.setRange(xRange=frameRange)
+        self.timeWidget.setMouseEnabled(False, False)
+        self.plotDockWidget = QtGui.QDockWidget("Timeline", self)
         self.plotDockWidget.setFeatures(QtGui.QDockWidget.DockWidgetClosable)
-        self.plotDockWidget.setWidget(self.plotWidget)
+        self.plotDockWidget.setWidget(self.timeWidget)
         self.addDockWidget(QtCore.Qt.BottomDockWidgetArea, self.plotDockWidget)
         self.toolBar.addAction(self.plotDockWidget.toggleViewAction())
 
@@ -88,22 +95,14 @@ class GUI(QtGui.QMainWindow):
             x, y = np.arange(len(a1)), a1
         else:
             x, y = a1, a2
-        self.plotWidget.clear()
-        self.plotWidget.plot(x,y, symbol='o', symbolSize=3)
-        self.timeLine = QtGraph.InfiniteLine(angle=90, movable=True)
-        self.timeLine.setBounds((min(x), max(x)))
-        self.timeLine.sigPositionChanged.connect(self.updateRenderWindow)
-        self.plotWidget.addItem(self.timeLine)
+        self.timeWidget.plot(x,y, symbol='o', symbolSize=3)
 
     def updateRenderWindow(self):
-        x = self.plotWidget.plotItem.listDataItems()[0].xData
-        t = bisect.bisect_left(x, self.timeLine.value())
+        t = round(self.timeLine.value())
         self.scene.update_all(t=t)
 
     def run(self):
-        if len(self.plotWidget.plotItem.listDataItems())==0:
-            fs = len(self.scene)
-            self.plot(np.arange(fs), np.ones(fs))
+        self.initTimeline()
         self.show()
         self.scene.iren.Initialize()
         self.app.exec_()
