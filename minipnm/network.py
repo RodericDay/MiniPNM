@@ -381,6 +381,10 @@ class Radial(Network):
         maxima = (self.coords + self['sphere_radii']).max(axis=1)
         return maxima - minima
 
+    @property
+    def volumes(self):
+        return self['sphere_radii']**3 * 4./3. * np.pi
+
     def prune_colliding(self):
         for center, radius in zip(self.points, self['sphere_radii']):
             safe = ~geometry.intersecting(center, radius,
