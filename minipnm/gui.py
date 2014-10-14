@@ -44,6 +44,9 @@ class GUI(QtGui.QMainWindow):
         QtGui.QMainWindow.__init__(self, parent)
         self.move(200,200)
 
+        self.tabWidget = QtGui.QTabWidget()
+        self.setCentralWidget(self.tabWidget)
+
         self.initToolBar()
         self.initVtk() # the show command is called here, before vtk initialize
         # timeline gets init at runtime
@@ -61,7 +64,7 @@ class GUI(QtGui.QMainWindow):
         self.vl.addWidget(self.vtkWidget)
         self.scene = Scene(self.vtkWidget)
         self.frame.setLayout(self.vl)
-        self.setCentralWidget(self.frame)
+        self.tabWidget.addTab(self.frame, 'Render')
 
     def initTimeline(self):
         '''
@@ -90,12 +93,16 @@ class GUI(QtGui.QMainWindow):
         self.setCorner(QtCore.Qt.BottomLeftCorner, QtCore.Qt.LeftDockWidgetArea)
         self.toolBar.addAction(self.treeDockWidget.toggleViewAction())
 
-    def plot(self, a1, a2=None):
+    def plot(self, a1, a2=None, name=None):
+        if name is None:
+            name = "Plot #{}".format(self.tabWidget.count())
         if a2 is None:
             x, y = np.arange(len(a1)), a1
         else:
             x, y = a1, a2
-        self.timeWidget.plot(x,y, symbol='o', symbolSize=3)
+        newPlot = QtGraph.PlotWidget()
+        newPlot.plot(x,y, symbol='o', symbolSize=3)
+        self.tabWidget.addTab(newPlot, name)
 
     def updateRenderWindow(self):
         t = round(self.timeLine.value())

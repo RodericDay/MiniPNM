@@ -182,6 +182,8 @@ class Scene(object):
         return len([actor for actor in self])
         
     def __len__(self):
+        if self.count==0:
+            return 0
         return max(len(actor.script) for actor in self)
 
     def handle_pick(self, obj, event):
