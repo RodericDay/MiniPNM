@@ -143,9 +143,11 @@ class Diffusion(Simulation):
         self.LHS =  u*self.cmat + sparse.diags(1-u*csum, 0)
 
     def march(self, inputs=0):
-        losses = sum((T-self.state)*b for T, b in self.dbcs.items())
+        losses = 0
+        for value, locs in self.dbcs.items():
+            losses = (self.state-value)*locs
         A = self.RHS.astype(float)
-        b = self.LHS*self.state + inputs + losses
+        b = self.LHS*self.state + inputs - losses
         x = spsolve(A, b)
         self.state = np.where(self.blocked, self.state, x) # dubious
 
