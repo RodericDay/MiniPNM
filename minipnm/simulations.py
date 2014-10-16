@@ -115,6 +115,14 @@ class Simulation(object):
         wires = graphics.Wires(points, pairs, self.history, **kwargs)
         scene.add_actors([wires])
 
+    def steady_state(self, steps_back=5, tolerance=1E-3):
+        '''
+        naively checks to see if the changes in history have stagnated
+        '''
+        if self.step < steps_back:
+            return False
+        return np.all(np.diff(self.history[-steps_back:], axis=0) < tolerance)
+
 
 class Diffusion(Simulation):
     '''
@@ -145,7 +153,7 @@ class Diffusion(Simulation):
     def march(self, inputs=0):
         losses = 0
         for value, locs in self.dbcs.items():
-            losses = (self.state-value)*locs
+            losses += (self.state-value)*locs
         A = self.RHS.astype(float)
         b = self.LHS*self.state + inputs - losses
         x = spsolve(A, b)
