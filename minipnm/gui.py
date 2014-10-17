@@ -103,6 +103,7 @@ class GUI(QtGui.QMainWindow):
         newPlot = QtGraph.PlotWidget()
         newPlot.plot(x,y, symbol='o', symbolSize=3)
         self.tabWidget.addTab(newPlot, name)
+        self.tabWidget.setCurrentWidget(newPlot)
 
     def updateRenderWindow(self):
         t = round(self.timeLine.value())
