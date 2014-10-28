@@ -26,6 +26,14 @@ class Simulation(object):
         self.block_history = {}
         self.block(None)
 
+    def reset(self, base=None):
+        if base is None:
+            self.state_history = [self.history[0]]
+        else:
+            self.state_history = [base*np.ones_like(self.state, dtype=float)]
+        self.block_history = {}
+        self.block(None)
+
     @property
     def indexes(self):
         return np.arange(self.state.size)
