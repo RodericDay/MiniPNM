@@ -93,17 +93,22 @@ class GUI(QtGui.QMainWindow):
         self.setCorner(QtCore.Qt.BottomLeftCorner, QtCore.Qt.LeftDockWidgetArea)
         self.toolBar.addAction(self.treeDockWidget.toggleViewAction())
 
-    def plot(self, a1, a2=None, name=None):
+    def newPlot(self, name=None):
         if name is None:
             name = "Plot #{}".format(self.tabWidget.count())
-        if a2 is None:
-            x, y = np.arange(len(a1)), a1
-        else:
-            x, y = a1, a2
-        newPlot = QtGraph.PlotWidget()
-        newPlot.plot(x,y, symbol='o', symbolSize=3)
-        self.tabWidget.addTab(newPlot, name)
-        self.tabWidget.setCurrentWidget(newPlot)
+        plotWidget = QtGraph.PlotWidget()
+        self.tabWidget.addTab(plotWidget, name)
+        self.tabWidget.setCurrentWidget(plotWidget)
+        return plotWidget
+
+    @property
+    def plot(self):
+        try:
+            plotWidget = self.tabWidget.currentWidget()
+            plotWidget.plot
+        except AttributeError:
+            plotWidget = self.newPlot()
+        return plotWidget.plot
 
     def updateRenderWindow(self):
         t = round(self.timeLine.value())
