@@ -382,6 +382,10 @@ class Radial(Network):
         return maxima - minima
 
     @property
+    def areas(self):
+        return self['sphere_radii']**2 * 4. * np.pi
+
+    @property
     def volumes(self):
         return self['sphere_radii']**3 * 4./3. * np.pi
 
