@@ -3,6 +3,8 @@ from tempfile import NamedTemporaryFile
 from subprocess import call
 import itertools as it
 import numpy as np
+
+import matplotlib as mpl
 from matplotlib import cm
 
 try:
@@ -11,11 +13,6 @@ except ImportError:
     vtk = type("vtk module missing. functionality unavailable!",
                (), {'vtkActor': object})
 
-def bind(array):
-    array = np.atleast_2d(array).astype(float)
-    array = np.subtract(array, array.min())
-    array = np.divide(array, array.max()) if array.max() != 0 else array
-    return array
 
 class Actor(vtk.vtkActor):
     callable = print
@@ -53,31 +50,33 @@ class Wires(Actor):
     '''
     Points and lines. The script determines the color of the lines.
     '''
-    def __init__(self, points, pairs, values=None, alpha=1, cmap=None):
+    def __init__(self, points, pairs, values=None, cmap=None, alpha=1, vmin=None, vmax=None):
         self.polydata = vtk.vtkPolyData()
         self.set_points(points)
         self.set_lines(pairs)
         self.mapper = vtk.vtkPolyDataMapper()
         self.mapper.SetInput(self.polydata)
         self.SetMapper(self.mapper)
+        self.GetProperty().SetOpacity(alpha)
 
         if values is None:
-            values = [0.5 for _ in points]
-        self.script = 255*bind(values)
-        self.cmap = cmap
+            values = np.ones(len(points))*0.5
+            vmin, vmax = 0, 1
+        self.script = np.atleast_2d(values)
+        cmap = cm.get_cmap(cmap if cmap is not None else 'coolwarm')
+        vmin = vmin if vmin is not None else self.script.min()
+        vmax = vmax if vmax is not None else self.script.max()
+        norm = mpl.colors.Normalize(vmin=vmin, vmax=vmax)
+        self.cmapper = cm.ScalarMappable(norm=norm, cmap=cmap)
         self.update()
-
-        self.GetProperty().SetOpacity(alpha)
 
     def set_scalars(self, values):
         colors = vtk.vtkUnsignedCharArray()
         colors.SetNumberOfComponents(3)
-        if self.cmap is None:
-            self.cmap = 'coolwarm'
-        colormap = cm.get_cmap(self.cmap)
-        mapped = colormap(values.astype(int))
-        for r,g,b,a in 255*mapped:
+
+        for r,g,b,a in 255*self.cmapper.to_rgba(values):
             colors.InsertNextTuple3(r,g,b)
+
         self.polydata.GetPointData().SetScalars(colors)
 
 
