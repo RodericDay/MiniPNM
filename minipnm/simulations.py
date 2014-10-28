@@ -123,13 +123,19 @@ class Simulation(object):
         wires = graphics.Wires(points, pairs, self.history, **kwargs)
         scene.add_actors([wires])
 
-    def steady_state(self, steps_back=5, tolerance=1E-3):
+    def steady_state(self, steps_back=5):
         '''
         naively checks to see if the changes in history have stagnated
         '''
         if self.step < steps_back:
             return False
-        return np.all(np.diff(self.history[-steps_back:], axis=0) < tolerance)
+
+        a = self.history[-steps_back]
+        for i in range(1, steps_back):
+            b = self.history[-i]
+            if not np.allclose(a, b, rtol=1e-03, atol=1e-06):
+                return False
+        return True
 
 
 class Diffusion(Simulation):
