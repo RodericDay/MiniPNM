@@ -286,6 +286,20 @@ class Network(dict):
             wires = graphics.Wires(self.points, self.pairs, values, **kwargs)
         return [wires]
 
+    def plot(self, *values):
+        rotation = itertools.cycle(['Blues', 'hot', 'summer', 'copper', 'rainbow'])
+
+        if 0 not in self.bbox:
+            raise NotImplementedError('Only usable by 1D or 2D networks')
+        canvas = 'xyz'[self.bbox.tolist().index(0)]
+        self[canvas] *= 0
+
+        scene = graphics.Scene()
+        self.render(scene=scene)
+        for arr, cmap in zip(values, rotation):
+            self[canvas][:] = arr
+            self.render(scene=scene, cmap=cmap)
+        scene.play()
 
 class Cubic(Network):
 
