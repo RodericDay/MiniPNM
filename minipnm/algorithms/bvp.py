@@ -2,18 +2,18 @@ import numpy as np
 from scipy import sparse
 from scipy.sparse.linalg import spsolve
 
-def solve(system, dirichlet, neumann=None):
+def solve(system, dirichlet, ssterms=0, neumann=None):
     '''
     boundary conditions given as dictionaries of { value : mask }
     the length of the Dirichlet masks should be of network.order,
     while Neumann masks are the indices of the tail and head of any specified
     edge gradient.
     '''
-    A, b = build(system, dirichlet, neumann, fast=True)
+    A, b = build(system, dirichlet, ssterms, neumann, fast=True)
     x = spsolve(A, b).round(5)
     return x
 
-def build(system, dirichlet, neumann=None, fast=False):
+def build(system, dirichlet, ssterms=0, neumann=None , fast=False):
     if neumann is None: neumann = {}
     n_conditions_imposed = count_conditions(system, dirichlet, neumann)
 
@@ -42,7 +42,7 @@ def build(system, dirichlet, neumann=None, fast=False):
 
     if fast:
         A = sparse.vstack(e for e in elements_of_A if e.nnz)
-        b = np.hstack(elements_of_b)
+        b = np.hstack(elements_of_b) + ssterms
         return A, b
 
     # reorders the system to preserve original structure

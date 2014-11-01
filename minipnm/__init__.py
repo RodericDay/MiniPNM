@@ -11,7 +11,7 @@ from .graphics import Scene
 from .misc import *
 from .utils import *
 from .binary import *
-from . import algorithms
+from .algorithms import *
 from . import simulations
 from . import geometry
 from . import image
