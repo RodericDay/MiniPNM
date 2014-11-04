@@ -99,17 +99,15 @@ class Network(dict):
     def indexes(self):
         return np.arange(self.order)
 
-    @property
-    def laplacian(self):
-        return self.system(nvalues=-self.adjacency_matrix.sum(axis=1).A1)
-
-    def system(self, cvalues=1, nvalues=1):
+    def system(self, cvalues=1, nvalues=None):
         '''
         Returns a matrix representing a system of equations
         '''
         A = self.adjacency_matrix.astype(float)
         A.data *= cvalues
         D = self.diagonals.astype(float)
+        if nvalues is None:
+            nvalues = -A.sum(axis=1).A1
         D.data *= nvalues
         return A + D
 
