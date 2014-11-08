@@ -2,16 +2,26 @@ import numpy as np
 from scipy import sparse
 from scipy.sparse.linalg import spsolve
 
-def solve(system, dirichlet, ssterms=0, neumann=None):
+def solve(system, dirichlet, ssterms=0, neumann=None, units=None):
     '''
     boundary conditions given as dictionaries of { value : mask }
     the length of the Dirichlet masks should be of network.order,
     while Neumann masks are the indices of the tail and head of any specified
     edge gradient.
     '''
+    if units is not None:
+        potential_units = units
+        flux_units = system.units * potential_units
+        system = system( flux_units / potential_units )
+        ssterms = ssterms( flux_units )
+        if potential_units is not 1:
+            dirichlet = { k(potential_units):v for k,v in dirichlet.items() }
+            if neumann is not None:
+                neumann = { k(potential_units):v for k,v in neumann.items() }
+
     A, b = build(system, dirichlet, ssterms, neumann, fast=True)
     x = spsolve(A, b).round(5)
-    return x
+    return x * (1 if units is None else units)
 
 def build(system, dirichlet, ssterms=0, neumann=None , fast=False):
     if neumann is None: neumann = {}

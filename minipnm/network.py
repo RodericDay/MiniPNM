@@ -67,7 +67,7 @@ class Network(dict):
 
     @property
     def lengths(self):
-        return np.linalg.norm(self.spans, axis=1).astype('float16')
+        return np.linalg.norm(self.spans, axis=1).astype('float32')
 
     @property
     def diagonals(self):
@@ -77,7 +77,7 @@ class Network(dict):
     def adjacency_matrix(self):
         tails, heads = self.pairs.T
         ijk = np.ones_like(tails), (heads, tails)
-        return sparse.coo_matrix(ijk, shape=(self.order, self.order))
+        return sparse.coo_matrix(ijk, shape=(self.order, self.order), dtype=float)
 
     @property
     def labels(self):
@@ -99,17 +99,17 @@ class Network(dict):
     def indexes(self):
         return np.arange(self.order)
 
-    def system(self, cvalues=1, nvalues=None):
+    def system(self, cvalues=1, units=None):
         '''
         Returns a matrix representing a system of equations
         '''
+        if units is not None:
+            cvalues = cvalues(units)
         A = self.adjacency_matrix.astype(float)
         A.data *= cvalues
         D = self.diagonals.astype(float)
-        if nvalues is None:
-            nvalues = -A.sum(axis=1).A1
-        D.data *= nvalues
-        return A + D
+        D.data *= -A.sum(axis=1).A1
+        return (A + D) * (1 if units is None else units)
 
     def boundary(self):
         all_points = self.indexes
