@@ -38,11 +38,11 @@ class Spheres(GeometryInterface):
 
     @property
     def areas(self):
-        return 4 * np.pi * self.radii**2
+        return (4 * np.pi * self.radii**2).squeeze()
 
     @property
     def volumes(self):
-        return 4./3. * np.pi * self.radii**3
+        return (4./3. * np.pi * self.radii**3).squeeze()
 
 
 class Cylinders(GeometryInterface):
@@ -106,8 +106,8 @@ class Cylinders(GeometryInterface):
 
     @property
     def areas(self):
-        return 2 * np.pi * self.radii * self.heights
+        return (2 * np.pi * self.radii * self.heights).squeeze()
 
     @property
     def volumes(self):
-        return np.pi * self.radii**2 * self.heights
+        return (np.pi * self.radii**2 * self.heights).squeeze()
