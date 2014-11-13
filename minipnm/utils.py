@@ -44,7 +44,7 @@ def property_from(list_of_keys, dtype=None, default=None):
         return np.vstack([self.get(key, default) for key in list_of_keys]).T
 
     def setter(self, values):
-        values = np.nan_to_num(np.atleast_2d(values))
+        values = np.nan_to_num(np.array(values)).reshape(-1, len(list_of_keys))
         for key, array in zip(list_of_keys, values.T):
             self[key] = array.astype(dtype) if dtype else array
 

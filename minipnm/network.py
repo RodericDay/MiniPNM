@@ -371,20 +371,20 @@ class Radial(Network):
     If connectivity pairs aren't specified, default is Delaunay tessellation.
     Pruning follows to ensure there are no collisions regardless.
     '''
-    spans = utils.property_from(['cylinder_length_x','cylinder_length_y','cylinder_length_z'])
-    midpoints = utils.property_from(['cylinder_center_x','cylinder_center_y','cylinder_center_z'])
 
     def __init__(self, centers, radii, pairs=None, prune=True, f=2):
-        self.points = np.array(centers, dtype=float)
+        self.spheres = geometry.Spheres(self)
+        self.cylinders = geometry.Cylinders(self)
+
+        self.spheres.centers = centers
+        self.spheres.radii = np.ones(self.order, dtype=float)*radii
+
         if pairs is None:
             pairs = Delaunay.edges_from_points(self.points)
         self.pairs = np.atleast_2d(pairs)
 
-        self['sphere_radii'] = np.ones(self.order, dtype=float)*radii
-        self['cylinder_radii'] = self['sphere_radii'][self.pairs].min(axis=1)/f
-        self.spans, self.midpoints = geometry.cylinders(self.points, self['sphere_radii'], self.pairs)
-
-        if prune:
+        self.cylinders.generate(f)
+        if prune is True:
             self.prune_colliding()
 
     @property
@@ -393,24 +393,15 @@ class Radial(Network):
         maxima = (self.coords + self['sphere_radii']).max(axis=1)
         return maxima - minima
 
-    @property
-    def areas(self):
-        return self['sphere_radii']**2 * 4. * np.pi
-
-    @property
-    def volumes(self):
-        return self['sphere_radii']**3 * 4./3. * np.pi
-
     def prune_colliding(self):
-        for center, radius in zip(self.points, self['sphere_radii']):
-            safe = ~geometry.intersecting(center, radius,
-                        self.spans, self.midpoints, self['cylinder_radii'])
+        for center, radius in zip(self.spheres.centers, self.spheres.radii):
+            safe = ~self.cylinders.intersecting(center, radius)
 
             # deletes and stuff
             self.pairs = self.pairs[safe]
-            self.midpoints = self.midpoints[safe]
-            self.spans = self.spans[safe]
-            self['cylinder_radii'] = self['cylinder_radii'][safe]
+            self.cylinders.midpoints = self.cylinders.midpoints[safe]
+            self.cylinders.spans = self.cylinders.spans[safe]
+            self.cylinders.radii = self.cylinders.radii[safe]
 
     def rasterize(self, resolution=20):
         offset = (self.coords - self['sphere_radii']).min(axis=1)
@@ -431,7 +422,7 @@ class Radial(Network):
 
     def actors(self, saturation_history=None):
         shells = graphics.Spheres(self.points, self['sphere_radii'], color=(1,1,1), alpha=0.4)
-        tubes = graphics.Tubes(self.midpoints, self.spans, self['cylinder_radii'])
+        tubes = graphics.Tubes(self.cylinders.midpoints, self.cylinders.spans, self['cylinder_radii'])
         if saturation_history is None:
             return [shells, tubes]
 
@@ -441,9 +432,6 @@ class Radial(Network):
         return [shells, tubes, history]
 
     def porosity(self):
-        box = np.prod(self.bbox)
-        spheres = (self['sphere_radii']**3 * 4./3. * np.pi)
-        lengths = np.linalg.norm(self.spans, axis=1)
-        lengths/= 2 # account for duplicity
-        circles = self['cylinder_radii']**2 * np.pi
-        return (spheres.sum() + (lengths*circles).sum()) / box
+        total_volume = np.prod(self.bbox)
+        hollowed_out = self.spheres.volumes.sum() + self.cylinders.volumes.sum()/2 # double counting of cylinders
+        return hollowed_out/total_volume
