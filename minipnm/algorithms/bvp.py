@@ -13,7 +13,8 @@ def solve(system, dirichlet, ssterms=0, neumann=None, units=None):
         potential_units = units
         flux_units = system.units * potential_units
         system = system( flux_units / potential_units )
-        ssterms = ssterms( flux_units )
+        if ssterms is not 0:
+            ssterms = ssterms( flux_units )
         if potential_units is not 1:
             dirichlet = { k(potential_units):v for k,v in dirichlet.items() }
             if neumann is not None:
