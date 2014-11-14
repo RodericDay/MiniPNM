@@ -1,84 +1,63 @@
+import logging
 import numpy as np
-import simulations
+from scipy import optimize
+import minipnm as mini
+import MKS
+MKS.define(globals())
 
-'''
-Houses comprehensive multi-layer models
-'''
-
-def BV(i):
-    ''' fake butler-volmer. takes current returns voltage. per point. '''
-    return 1.223 - 0.45 - 0.03 * np.log(i) # V
-
-def takesarray(method):
-    def wrapped(self, array):
-        out = []
-        for inputs in array:
-            print "Calling {} @ {:0<6}".format(method.__name__, inputs)
-            out.append( method(self, inputs) )
-        return np.array(out).T
-    return wrapped
+def butler_volmer(oxygen, overpotential):
+    E1 = np.exp(   2 *   alf   * F / (R * T) * overpotential )
+    E2 = np.exp( - 2 * (1-alf) * F / (R * T) * overpotential )
+    AO2 = 1
+    j_orr = -j0 * AO2**0.25 * ( E1 - E2 )
+    return j_orr
 
 
-class CatalystLayer(object):
-
-    def __init__(self, network):
-        ''' create all the layers of the model and the ways
-        they will interface with each other '''
-        self.network = network
-        adj = network.adjacency_matrix
-        volumes = self.network.volumes
-        # layers
-        self.current_layer = simulations.Simulation(adj)
-        self.voltage_layer = simulations.Simulation(adj)
-        self.water_layer = simulations.Invasion(adj, volumes)
-        self.oxygen_layer = simulations.Diffusion(adj)
-
-    def __getattr__(self, string):
-        ''' ugly hack. if attribute not found, check network for it
-            to improve, maybe network subclass in the first place?
-            maybe metaclass?
+class SimpleLatticedCatalystLayer(object):
+    
+    def __init__(self, grid_shape, thickness, porosity):
         '''
-        try:
-            return super(CatalystLayer, self).__getattr__(string)
-        except AttributeError:
-            return getattr(self.network, string)
+        init by generating geometrical stuff
+        '''
+        topology = mini.Cubic(grid_shape)
+        scale = thickness(m) / topology.bbox[0]
+        topology.points *= scale
 
-    def reset(self, current=None, voltage=None, saturation=None):
-        self.current_layer.reset(current)
-        self.voltage_layer.reset(voltage)
-        self.water_layer.reset(saturation)
+        # quickfit for porosity
+        def objf(r):
+            geometry = mini.Radial(topology.points, abs(r), topology.pairs, prune=False)
+            return geometry.porosity()
+        def minf(r):
+            return abs(porosity - objf(r))
+        r = abs(optimize.minimize_scalar(minf).x)
+
+        self.geometry = mini.Radial(topology.points, r, topology.pairs)
 
     @property
-    def voltage(self):
-        return self.voltage_layer.state.mean()
+    def npores(self):
+        return self.geometry.order
 
     @property
-    def saturation(self):
-        return 0
+    def pore_surface_area(self):
+        return self.geometry.spheres.areas
 
-    @takesarray
-    def ICC(self, current):
-        '''
-        takes current density demand
-        returns steady-state supply voltage
-        '''
-        self.reset(current=current)
-        t = 0
-        while t < 1:
-            t += 1
-            print "@", t
-        return BV(current*0.9), self.saturation
+    @property
+    def geometric_surface_area(self):
+        t, h, w = self.geometry.bbox * m
+        return h * w
 
-    @takesarray
-    def ICV(self, voltage):
-        self.reset(voltage=voltage)
-        t = 0
-        while t < 1:
-            pass
-        return voltage, self.saturation
+    def react_to_input(self, current):
+        print current
+        # oxygen_molar_flux = current / ( 4 * F )
+        # oxygen_molar_fraction = mini.bvp.spsolve(self.O, oxygen_molar_flux)
+        # oxygen_concentration = oxygen_molar_fraction * c
 
-    def render(self, scene):
-        offset = self.bbox*[0,1,0]*1.5
-        self.current_layer.render(self.points+offset, scene=scene)
-        self.network.render(scene=scene)
-        self.water_layer.render(self.points, scene=scene)
+    def render(self):
+        self.geometry.render()
+
+if __name__ == '__main__':
+    t = 15*um
+    I_guess = 100000 * mA / cm ** 2
+
+    catalyst_layer = SimpleLatticedCatalystLayer([10, 2, 2], t, 0.4)
+    catalyst_layer.react_to_input(2*A)
