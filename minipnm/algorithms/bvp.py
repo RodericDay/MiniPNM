@@ -82,3 +82,65 @@ def count_conditions(system, dirichlet, neumann):
     if any(n_conditions_imposed > 1):
         raise Exception("Overlapping BCs")
     return n_conditions_imposed
+
+
+class System(object):
+    '''
+    this class compartmentalizes the creation of a system with BCs to an init
+    step, but then allows the direct update of conductance values without
+    rebuilding the entire matrix every time, for fast iterations over changing
+    environmental conditions
+    '''
+    def __init__(self, pairs, dbcs, values=1):
+        # does not check for overlap
+        self.free = ~np.sum(dbcs.values(), axis=0, dtype=bool)
+        self.bvals = np.sum( value * locations for value, locations in dbcs.items() )
+
+        # if the sink is not free, it will be a fixed value, so ignore
+        i, j = pairs.T
+        self.valid = np.in1d(j, self.free.nonzero())
+        i, j = i[self.valid], j[self.valid] # adjusting
+
+        # first block: adjacencies
+        k = np.arange( self.valid.sum() ) + 1
+        n = self.free.size
+        ijk = k, (j, i)
+        A1 = sparse.coo_matrix(ijk, shape=(n, n))
+
+        # second block: balances
+        free_ids = self.free.nonzero()[0]
+        l = np.arange(A1.nnz+1, A1.nnz+1 + free_ids.size)
+        lmn = l, (free_ids, free_ids)
+        A2 = sparse.coo_matrix(lmn, shape=(n, n))
+
+        # third block: definitions
+        bv_ids = (~self.free).nonzero()[0]
+        o = np.arange(A1.nnz+A2.nnz+1, A1.nnz+A2.nnz+1+bv_ids.size)
+        opq = o, (bv_ids, bv_ids)
+        A3 = sparse.coo_matrix(opq, shape=(n, n))
+
+        # save for recall
+        self.indexed = (A1 + A2 + A3).tocsr().astype(float)
+        self.reindexer = np.argsort(self.indexed.data)
+        self.A1, self.A2, self.A3 = A1, A2, A3
+        self.update(values)
+
+    def update(self, values):
+        '''
+        upon receiving values for conductances,
+        we need to set them in the system matrix,
+        and rebalance the nodes for conservation
+        '''
+        self.system = self.indexed.copy()
+        values = (self.valid*values)[self.valid]
+
+        self.system.data[self.reindexer[self.A1.data-1]] = values
+        self.system.data[self.reindexer[self.A2.data-1]] = 0
+        sums = -self.system.sum(axis=1).A1
+        self.system.data[self.reindexer[self.A2.data-1]] = sums[self.free]
+        self.system.data[self.reindexer[self.A3.data-1]] = 1
+
+    def solve(self, ssterms=0):
+        A = self.system
+        b = np.where(self.free, ssterms, self.bvals)
+        return spsolve(A, b)
