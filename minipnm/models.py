@@ -35,30 +35,30 @@ class SimpleLatticedCatalystLayer(object):
         gdl = x == x.max()
 
         s_C = 1000 * S / m # electric conductivity of carbon
-        e_conds = lambda self: (-s_C * self.carbon_area / self.lengths)(S)
-        ebcs = { 0.68 : gdl }
+        e_conds = lambda self: (-s_C * self.carbon_area / self.lengths)
+        ebcs = { 0.68*V : gdl }
         self.electron_transport = mini.bvp.System(self.geometry.pairs, ebcs, e_conds(self) )
 
         # s_N = 100 * np.exp( ( 15.036 * 1 - 15.811) * 1000*K/T + (-30.726 * 1 + 30.481) ) * S / m
         s_N = 10 * S / m # protonic conductivity of nafion
-        p_conds = lambda self: (-s_N * self.nafion_area / self.lengths)(S)
-        pbcs = { 0 : membrane }
+        p_conds = lambda self: (-s_N * self.nafion_area / self.lengths)
+        pbcs = { 0*V : membrane }
         self.proton_transport = mini.bvp.System(self.geometry.pairs, pbcs, p_conds(self) )
 
         t_C = 0.5 * W / K / m * 100 # thermal conductivity of carbon
-        t_conds = lambda self: (-t_C * self.carbon_area / self.lengths)(W/K)
-        tbcs = { 353 : gdl }
+        t_conds = lambda self: (-t_C * self.carbon_area / self.lengths)
+        tbcs = { 353*K : gdl }
         self.heat_transport = mini.bvp.System(self.geometry.pairs, tbcs, t_conds(self) )
 
         D_b = 2.02E-5 * m**2 / s * 1E14 # binary diffusion coefficient
         def d_conds(self):
             c = self.pressure / ( R * 353*K )
-            g_half = np.pi * self.geometry.spheres.radii.squeeze() * c * D_b
-            g_cyl = self.geometry.cylinders.areas / self.geometry.cylinders.heights.squeeze() * c * D_b
+            g_half = np.pi * self.geometry.spheres.radii.squeeze()*m * c * D_b
+            g_cyl = self.geometry.cylinders.areas / self.geometry.cylinders.heights.squeeze()*m * c * D_b
 
             gis, gjs = g_half.quantity[self.geometry.pairs.T] * g_half.units
             g_D = (1 / gis + 1 / g_cyl + 1 / gjs)**-1
-            return g_D(mol/m/s)
+            return g_D
         dbcs = { 0.21 : gdl }
         self.gas_transport = mini.bvp.System(self.geometry.pairs, dbcs, d_conds(self))
 
@@ -114,17 +114,17 @@ class SimpleLatticedCatalystLayer(object):
     def solve_systems(self, input_current_density):
         local_current = input_current_density * self.pore_agglomerate_area
 
-        self.electronic_potential = self.electron_transport.solve( -local_current(A) ) * V
-        self.protonic_potential = self.proton_transport.solve( local_current(A) ) * V
+        self.electronic_potential = self.electron_transport.solve( -local_current )
+        self.protonic_potential = self.proton_transport.solve( local_current )
 
         E0 = 1.223 * V
         self.overpotential = self.electronic_potential - self.protonic_potential - E0
 
         heat_generation = local_current * self.overpotential
-        self.temperature = self.heat_transport.solve( heat_generation(W) ) * K
+        self.temperature = self.heat_transport.solve( heat_generation )
 
-        oxygen_molar_consumption = input_current_density / (4 * F)
-        self.oxygen_molar_fraction = self.gas_transport.solve( oxygen_molar_consumption(mol/s/m**2) )
+        oxygen_molar_consumption = local_current / (4 * F)
+        self.oxygen_molar_fraction = self.gas_transport.solve( oxygen_molar_consumption )
 
         output_current_density = self.orr
         return output_current_density

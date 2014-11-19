@@ -91,12 +91,17 @@ class System(object):
     rebuilding the entire matrix every time, for fast iterations over changing
     environmental conditions
     '''
-    def __init__(self, pairs, dbcs, values=1):
-        # does not check for overlap
-        self.free = ~np.sum(dbcs.values(), axis=0, dtype=bool)
-        self.bvals = np.sum( value * locations for value, locations in dbcs.items() )
+    def __init__(self, pairs, dbcs, conductances):
+        # gather units in case they are implemented, for typechecks
+        self.cu = conductances.units if hasattr(conductances, 'units') else 1
+        bcunits = [k.units if hasattr(k, 'units') else 1 for k in dbcs.keys()]
+        assert all(bcunits[0]==u for u in bcunits)
+        self.pu = bcunits[0]
+        self.fu = self.cu * self.pu
 
-        # if the sink is not free, it will be a fixed value, so ignore
+        # if the node is not free, it will be a fixed value. consider rest.
+        # warning: does not check for overlap
+        self.free = ~np.sum( dbcs.values(), axis=0, dtype=bool )
         i, j = pairs.T
         self.valid = np.in1d(j, self.free.nonzero())
         i, j = i[self.valid], j[self.valid] # adjusting
@@ -123,18 +128,20 @@ class System(object):
         self.indexed = (A1 + A2 + A3).tocsr().astype(float)
         self.reindexer = np.argsort(self.indexed.data)
         self.A1, self.A2, self.A3 = A1, A2, A3
-        self.update(values)
 
-    def update(self, values):
+        # delegation
+        self.bvals = np.sum( value/self.pu * locations for value, locations in dbcs.items() )
+        self.update(conductances)
+
+    def update(self, conductances):
         '''
-        upon receiving values for conductances,
-        we need to set them in the system matrix,
-        and rebalance the nodes for conservation
+        upon receiving conductances we need to set them in the system matrix,
+        and rebalance the nodes for flux conservation
         '''
         self.system = self.indexed.copy()
-        values = (self.valid*values)[self.valid]
+        conductances = (self.valid*conductances/self.cu)[self.valid]
 
-        self.system.data[self.reindexer[self.A1.data-1]] = values
+        self.system.data[self.reindexer[self.A1.data-1]] = conductances
         self.system.data[self.reindexer[self.A2.data-1]] = 0
         sums = -self.system.sum(axis=1).A1
         self.system.data[self.reindexer[self.A2.data-1]] = sums[self.free]
@@ -142,5 +149,5 @@ class System(object):
 
     def solve(self, ssterms=0):
         A = self.system
-        b = np.where(self.free, ssterms, self.bvals)
-        return spsolve(A, b)
+        b = np.where(self.free, ssterms/self.fu, self.bvals)
+        return spsolve(A, b) * self.pu
