@@ -307,14 +307,15 @@ class Cubic(Network):
         network['source'] = im.ravel()
         return network
     
-    def __init__(self, shape, spacing=None, bbox=None):
+    def __init__(self, shape, scaling=None, bbox=None):
         arr = np.atleast_3d(np.empty(shape))
 
         self.points = np.array([i for i,v in np.ndenumerate(arr)], dtype=float)
-        if spacing is not None:
-            self.points *= spacing
-        elif bbox is not None:
-            self.points *= bbox / self.points.max(axis=0)
+        if bbox is not None:
+            scaling = bbox / np.where( self.bbox==0, 1, self.bbox )
+        if scaling is not None:
+            self.points *= scaling
+            self.points += np.where( self.bbox==0, np.array(bbox)/2., 0 )
 
         I = np.arange(arr.size).reshape(arr.shape)
         tails, heads = [], []
