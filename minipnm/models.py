@@ -50,17 +50,8 @@ class SimpleLatticedCatalystLayer(object):
         tbcs = { 353*K : gdl }
         self.heat_transport = mini.bvp.System(self.geometry.pairs, tbcs, t_conds(self) )
 
-        D_b = 2.02E-5 * m**2 / s * 1E14 # binary diffusion coefficient
-        def d_conds(self):
-            c = self.pressure / ( R * 353*K )
-            g_half = np.pi * self.geometry.spheres.radii.squeeze()*m * c * D_b
-            g_cyl = self.geometry.cylinders.areas / self.geometry.cylinders.heights.squeeze()*m * c * D_b
-
-            gis, gjs = g_half.quantity[self.geometry.pairs.T] * g_half.units
-            g_D = (1 / gis + 1 / g_cyl + 1 / gjs)**-1
-            return g_D
         dbcs = { 0.21 : gdl }
-        self.gas_transport = mini.bvp.System(self.geometry.pairs, dbcs, d_conds(self))
+        self.gas_transport = mini.bvp.System(self.geometry.pairs, dbcs, self.diffusive_conductances )
 
     @property
     def npores(self):
@@ -91,6 +82,18 @@ class SimpleLatticedCatalystLayer(object):
     def geometric_surface_area(self):
         t, h, w = self.geometry.bbox * m
         return h * w
+
+    @property
+    def diffusive_conductances(self):
+        D_b = 2.02E-5 * m**2 / s / 1E3 # binary diffusion coefficient
+        c = self.pressure / ( R * 353*K )
+
+        g_half = np.pi * self.geometry.spheres.radii.squeeze()*m * c * D_b
+        g_cyl = self.geometry.cylinders.areas / self.geometry.cylinders.heights.squeeze()*m * c * D_b
+
+        gis, gjs = g_half.quantity[self.geometry.pairs.T] * g_half.units
+        g_D = (1 / gis + 1 / g_cyl + 1 / gjs)**-1
+        return g_D
 
     def measured_current_density(self, local_current_density):
         total_current_generated = (local_current_density * self.pore_agglomerate_area).sum()
