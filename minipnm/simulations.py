@@ -187,8 +187,8 @@ class Invasion(Simulation):
             return self.msg.format(self.node, self.saturation.mean()*100)
 
 
-    def __init__(self, cmat, capacities):
-        super(Invasion, self).__init__(cmat)
+    def __init__(self, cmat, capacities, base=0):
+        super(Invasion, self).__init__(cmat, base)
         self.capacities = np.ones_like(self.state) * capacities
         self.saturation = self.state
         self.update_pressurized_clusters()
