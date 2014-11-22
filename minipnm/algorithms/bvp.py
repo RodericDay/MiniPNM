@@ -1,3 +1,4 @@
+import itertools
 import numpy as np
 from scipy import sparse
 from scipy.sparse.linalg import spsolve
@@ -86,68 +87,62 @@ def count_conditions(system, dirichlet, neumann):
 
 class System(object):
     '''
-    this class compartmentalizes the creation of a system with BCs to an init
-    step, but then allows the direct update of conductance values without
-    rebuilding the entire matrix every time, for fast iterations over changing
-    environmental conditions
+    this class compartmentalizes the creation of a system to an init
+    step, but then allows the direct update of conductance values and 
+    application of boundary conditions without rebuilding the entire matrix
+    every time, for fast iterations over changing environmental conditions
     '''
-    def __init__(self, pairs, dbcs, conductances):
-        # gather units in case they are implemented, for typechecks
-        self.cu = conductances.units if hasattr(conductances, 'units') else 1
-        bcunits = [k.units if hasattr(k, 'units') else 1 for k in dbcs.keys()]
-        assert all(bcunits[0]==u for u in bcunits)
-        self.pu = bcunits[0]
-        self.fu = self.cu * self.pu
+    def __init__(self, pairs, conductances):
+        # create diags
+        self.n = n = np.max(pairs) + 1 # we need a better heuristic for stragglers
+        diags = np.arange(n) + 1 # otherwise the csr conversion drops the 0 (1)
+        D = sparse.diags(diags, 0)
 
-        # if the node is not free, it will be a fixed value. consider rest.
-        # warning: does not check for overlap
-        self.free = ~np.sum( dbcs.values(), axis=0, dtype=bool )
-        i, j = pairs.T
-        self.valid = np.in1d(j, self.free.nonzero())
-        i, j = i[self.valid], j[self.valid] # adjusting
+        # create rest
+        self.m = m = len(pairs)
+        k = np.arange(n, n+m) + 1
+        j, i = np.transpose(pairs)
+        ijk = k, (i, j)
+        A = sparse.coo_matrix(ijk, shape=(n, n))
 
-        # first block: adjacencies
-        k = np.arange( self.valid.sum() ) + 1
-        n = self.free.size
-        ijk = k, (j, i)
-        A1 = sparse.coo_matrix(ijk, shape=(n, n))
+        # quick recall map
+        self.mapping = [[] for _ in diags]
+        for row, idx in zip(A.row, A.data-1):
+            self.mapping[row].append( idx )
+        self.mapping = np.array(self.mapping)
 
-        # second block: balances
-        free_ids = self.free.nonzero()[0]
-        l = np.arange(A1.nnz+1, A1.nnz+1 + free_ids.size)
-        lmn = l, (free_ids, free_ids)
-        A2 = sparse.coo_matrix(lmn, shape=(n, n))
+        # combine to master
+        self._adj = (A + D)
+        self._adj.data -= 1 # recover proper indexing from (1)
+        self.reindex = np.argsort(self._adj.data)
 
-        # third block: definitions
-        bv_ids = (~self.free).nonzero()[0]
-        o = np.arange(A1.nnz+A2.nnz+1, A1.nnz+A2.nnz+1+bv_ids.size)
-        opq = o, (bv_ids, bv_ids)
-        A3 = sparse.coo_matrix(opq, shape=(n, n))
-
-        # save for recall
-        self.indexed = (A1 + A2 + A3).tocsr().astype(float)
-        self.reindexer = np.argsort(self.indexed.data)
-        self.A1, self.A2, self.A3 = A1, A2, A3
-
-        # delegation
-        self.bvals = np.sum( value/self.pu * locations for value, locations in dbcs.items() )
         self.update(conductances)
 
-    def update(self, conductances):
+    def update(self, values):
         '''
-        upon receiving conductances we need to set them in the system matrix,
-        and rebalance the nodes for flux conservation
+        replace conductance values and rebalance nodes for flux conservation
         '''
-        self.system = self.indexed.copy()
-        conductances = (self.valid*conductances/self.cu)[self.valid]
+        # create a skeleton and populate the conductance part
+        self._con = np.hstack([np.zeros(self.n), np.ones(self.m)*values])
 
-        self.system.data[self.reindexer[self.A1.data-1]] = conductances
-        self.system.data[self.reindexer[self.A2.data-1]] = 0
-        sums = -self.system.sum(axis=1).A1
-        self.system.data[self.reindexer[self.A2.data-1]] = sums[self.free]
-        self.system.data[self.reindexer[self.A3.data-1]] = 1
+        # figure out all the sinks
+        for sink, neighbors in enumerate(self.mapping):
+            self._con[sink] -= self._con[neighbors].sum()
 
-    def solve(self, ssterms=0):
-        A = self.system
-        b = np.where(self.free, ssterms/self.fu, self.bvals)
-        return spsolve(A, b) * self.pu
+    def system(self, dbcs):
+        A = self._adj.copy()
+        A.data[self.reindex] = self._con
+        b = np.zeros(self.n)
+
+        for bvalue, locations in dbcs.items():
+            A.data[self.reindex[locations]] = 1
+            A.data[self.reindex[self.mapping[locations].sum()]] = 0
+            b[locations] += bvalue
+
+        return A, b
+
+    def solve(self, dbcs, ssterms=0):
+        A, b = self.system(dbcs)
+        fixed = np.sum(dbcs.values(), axis=0)
+        b = np.where(fixed, b, ssterms)
+        return spsolve(A, b)
