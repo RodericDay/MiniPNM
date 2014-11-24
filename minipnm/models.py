@@ -7,10 +7,11 @@ MKS.define(globals())
 
 class SimpleLatticedCatalystLayer(object):
     
-    def __init__(self, grid_shape, thickness, porosity):
+    def __init__(self, grid_shape, thickness, porosity, pressure):
         topology = mini.Cubic(grid_shape)
         scale = thickness(m) / topology.bbox[0]
         topology.points *= scale
+        self.pressure = pressure
 
         # quickfit for porosity
         def objf(r):
@@ -28,30 +29,11 @@ class SimpleLatticedCatalystLayer(object):
         self.carbon_area = np.pi * (connection_radii - nafion_thickness)**2
         self.nafion_area = np.pi * connection_radii**2 - self.carbon_area
 
-    def generate_systems(self, pressure):
-        self.pressure = pressure
-        x,y,z = self.geometry.coords
-        membrane = x == x.min()
-        gdl = x == x.max()
-
-        s_C = 1000 * S / m # electric conductivity of carbon
-        e_conds = lambda self: (-s_C * self.carbon_area / self.lengths)
-        ebcs = { 0.68*V : gdl }
-        self.electron_transport = mini.bvp.System(self.geometry.pairs, ebcs, e_conds(self) )
-
-        # s_N = 100 * np.exp( ( 15.036 * 1 - 15.811) * 1000*K/T + (-30.726 * 1 + 30.481) ) * S / m
-        s_N = 10 * S / m # protonic conductivity of nafion
-        p_conds = lambda self: (-s_N * self.nafion_area / self.lengths)
-        pbcs = { 0*V : membrane }
-        self.proton_transport = mini.bvp.System(self.geometry.pairs, pbcs, p_conds(self) )
-
-        t_C = 0.5 * W / K / m * 100 # thermal conductivity of carbon
-        t_conds = lambda self: (-t_C * self.carbon_area / self.lengths)
-        tbcs = { 353*K : gdl }
-        self.heat_transport = mini.bvp.System(self.geometry.pairs, tbcs, t_conds(self) )
-
-        dbcs = { 0.21 : gdl }
-        self.gas_transport = mini.bvp.System(self.geometry.pairs, dbcs, self.diffusive_conductances )
+    def generate_systems(self):
+        self.electron_transport = mini.bvp.System(self.geometry.pairs, self.electronic_conductances, A, V )
+        self.proton_transport = mini.bvp.System(self.geometry.pairs, self.protonic_conductances, A, V )
+        self.heat_transport = mini.bvp.System(self.geometry.pairs, self.thermal_conductances, W, K )
+        self.gas_transport = mini.bvp.System(self.geometry.pairs, self.diffusive_conductances, mol/s, 1 )
 
     @property
     def npores(self):
@@ -84,6 +66,22 @@ class SimpleLatticedCatalystLayer(object):
         return h * w
 
     @property
+    def electronic_conductances(self):
+        s_C = 1000 * S / m # electric conductivity of carbon
+        return -s_C * self.carbon_area / self.lengths
+
+    @property
+    def protonic_conductances(self):
+        # s_N = 100 * np.exp( ( 15.036 * 1 - 15.811) * 1000*K/T + (-30.726 * 1 + 30.481) ) * S / m
+        s_N = 10 * S / m # protonic conductivity of nafion
+        return -s_N * self.nafion_area / self.lengths
+
+    @property
+    def thermal_conductances(self):
+        t_C = 0.5 * W / K / m * 100 # thermal conductivity of carbon
+        return -t_C * self.carbon_area / self.lengths
+
+    @property
     def diffusive_conductances(self):
         D_b = 2.02E-5 * m**2 / s / 1E3 # binary diffusion coefficient
         c = self.pressure / ( R * 353*K )
@@ -110,24 +108,28 @@ class SimpleLatticedCatalystLayer(object):
         n = self.overpotential
         E1 = np.exp(   2 *   alf   * F / (R * T) * n )
         E2 = np.exp( - 2 * (1-alf) * F / (R * T) * n )
-        AO2 = self.oxygen_molar_fraction.clip(0, np.inf)
-        j_orr = -j0 * AO2**0.25 * ( E1 - E2 )
+        AO2 = self.oxygen_molar_fraction
+        j_orr = -j0 * AO2 * ( E1 - E2 )
         return j_orr / 1000000
 
-    def solve_systems(self, input_current_density):
+    def solve_systems(self, input_current_density, bval):
+        x,y,z = self.geometry.coords
+        membrane = x == x.min()
+        gdl = x == x.max()
+
         local_current = input_current_density * self.pore_agglomerate_area
 
-        self.electronic_potential = self.electron_transport.solve( -local_current )
-        self.protonic_potential = self.proton_transport.solve( local_current )
+        self.electronic_potential = self.electron_transport.solve( { bval*V : gdl }, -local_current )
+        self.protonic_potential = self.proton_transport.solve( { 0*V : membrane }, local_current )
 
         E0 = 1.223 * V
         self.overpotential = self.electronic_potential - self.protonic_potential - E0
 
         heat_generation = local_current * self.overpotential
-        self.temperature = self.heat_transport.solve( heat_generation )
+        self.temperature = self.heat_transport.solve( { 353*K : gdl }, heat_generation )
 
         oxygen_molar_consumption = local_current / (4 * F)
-        self.oxygen_molar_fraction = self.gas_transport.solve( oxygen_molar_consumption )
+        self.oxygen_molar_fraction = self.gas_transport.solve( { 0.21 : gdl }, oxygen_molar_consumption )
 
         output_current_density = self.orr
         return output_current_density

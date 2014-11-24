@@ -92,7 +92,10 @@ class System(object):
     application of boundary conditions without rebuilding the entire matrix
     every time, for fast iterations over changing environmental conditions
     '''
-    def __init__(self, pairs, conductances):
+    def __init__(self, pairs, conductances, flux=1, potential=1):
+        self.fu = flux
+        self.pu = potential
+
         # create diags
         self.n = n = np.max(pairs) + 1 # we need a better heuristic for stragglers
         diags = np.arange(n) + 1 # otherwise the csr conversion drops the 0 (1)
@@ -122,6 +125,8 @@ class System(object):
         '''
         replace conductance values and rebalance nodes for flux conservation
         '''
+        values = values * (self.pu / self.fu)
+
         # create a skeleton and populate the conductance part
         self._con = np.hstack([np.zeros(self.n), np.ones(self.m)*values])
 
@@ -135,6 +140,8 @@ class System(object):
         b = np.zeros(self.n)
 
         for bvalue, locations in dbcs.items():
+            bvalue = bvalue / self.pu
+
             A.data[self.reindex[locations]] = 1
             A.data[self.reindex[self.mapping[locations].sum()]] = 0
             b[locations] += bvalue
@@ -144,5 +151,5 @@ class System(object):
     def solve(self, dbcs, ssterms=0):
         A, b = self.system(dbcs)
         fixed = np.sum(dbcs.values(), axis=0)
-        b = np.where(fixed, b, ssterms)
-        return spsolve(A, b)
+        b = np.where(fixed, b, ssterms / self.fu)
+        return spsolve(A, b) * self.pu
