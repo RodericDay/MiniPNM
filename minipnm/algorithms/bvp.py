@@ -134,7 +134,7 @@ class System(object):
         for sink, neighbors in enumerate(self.mapping):
             self._con[sink] -= self._con[neighbors].sum()
 
-    def system(self, dbcs):
+    def system(self, dbcs, s, k):
         A = self._adj.copy()
         A.data[self.reindex] = self._con
         b = np.zeros(self.n)
@@ -146,10 +146,16 @@ class System(object):
             A.data[self.reindex[self.mapping[locations].sum()]] = 0
             b[locations] += bvalue
 
+        fixed = np.sum(dbcs.values(), axis=0)
+        k /= (self.fu / self.pu)
+        A.data[self.reindex[:self.n]] -= np.where(fixed, 0, k)
+
         return A, b
 
-    def solve(self, dbcs, ssterms=0):
-        A, b = self.system(dbcs)
+    def solve(self, dbcs, s=None, k=None):
+        if s is None: s = 0 * self.fu
+        if k is None: k = 0 * self.fu / self.pu
+        A, b = self.system(dbcs, s, k)
         fixed = np.sum(dbcs.values(), axis=0)
-        b = np.where(fixed, b, ssterms / self.fu)
+        b = np.where(fixed, b, s / self.fu)
         return spsolve(A, b) * self.pu
