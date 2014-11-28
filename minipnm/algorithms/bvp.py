@@ -117,28 +117,44 @@ class System(object):
         # combine to master
         self._adj = (A + D)
         self._adj.data -= 1 # recover proper indexing from (1)
+
+        # the reindex is critical, it allows us to map natural arrays to the
+        # matrix in csr form
         self.reindex = np.argsort(self._adj.data)
 
-        self.update(conductances)
+        self.conductances = conductances
 
-    def update(self, values):
+    @property
+    def conductances(self):
         '''
-        replace conductance values and rebalance nodes for flux conservation
+        the real conductance array, self._con, matches the number of entries
+        in the matrix: n nodes followed by m connections, for quick updates.
+
+        however, the value of the nodes is pre-determined by the value of the
+        adjacent connections, so the conductance setter takes care of adjusting
+        the first n methods in the array. therefore, to maintain symmetry, a
+        call only exposes the last m
         '''
+        return self._con[self.m:]
+
+    @conductances.setter
+    def conductances(self, values):
+        # unit check
         values = values * (self.pu / self.fu)
 
         # create a skeleton and populate the conductance part
         self._con = np.hstack([np.zeros(self.n), np.ones(self.m)*values])
 
-        # figure out all the sinks
-        for sink, neighbors in enumerate(self.mapping):
-            self._con[sink] -= self._con[neighbors].sum()
+        # add up all the sinks
+        for ni, neighbors in enumerate(self.mapping):
+            self._con[ni] -= self._con[neighbors].sum()
 
-    def system(self, dbcs, s, k):
+    def system(self, dbcs={}, k=None):
         A = self._adj.copy()
         A.data[self.reindex] = self._con
         b = np.zeros(self.n)
 
+        # apply boundary conditions by turning equations into definitions
         for bvalue, locations in dbcs.items():
             bvalue = bvalue / self.pu
 
@@ -146,16 +162,21 @@ class System(object):
             A.data[self.reindex[self.mapping[locations].sum()]] = 0
             b[locations] += bvalue
 
-        fixed = np.sum(dbcs.values(), axis=0)
-        k /= (self.fu / self.pu)
-        A.data[self.reindex[:self.n]] -= np.where(fixed, 0, k)
+        # insert linear terms where applicable
+        if k is not None:
+            fixed = np.sum(dbcs.values(), axis=0)
+            k /= (self.fu / self.pu)
+            A.data[self.reindex[:self.n]] -= np.where(fixed, 0, k)
 
         return A, b
 
     def solve(self, dbcs, s=None, k=None):
-        if s is None: s = 0 * self.fu
-        if k is None: k = 0 * self.fu / self.pu
-        A, b = self.system(dbcs, s, k)
+        '''
+        dbcs = dirichlet boundary conditions in {} form
+        s = any leftover sink/source terms on the LHS
+        k = any linearly dependent terms ie: kx
+        '''
+        A, b = self.system(dbcs, k)
         fixed = np.sum(dbcs.values(), axis=0)
-        b = np.where(fixed, b, s / self.fu)
+        b = np.where(fixed, b, 0 if s is None else s / self.fu)
         return spsolve(A, b) * self.pu

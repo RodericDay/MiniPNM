@@ -23,9 +23,12 @@ class SimpleLatticedCatalystLayer(object):
 
         self.geometry = mini.Radial(topology.points, r, topology.pairs)
 
+        if any(self.geometry.spheres.radii < 10E-9):
+            raise Exception("some radii are smaller than 10 nm")
+
     def generate_agglomerate(self, specific_surface_area, nafion_thickness):
         self.specific_surface_area = specific_surface_area
-        connection_radii = self.geometry.cylinders.radii.squeeze() * m
+        connection_radii = self.geometry.cylinders.radii * m
         self.carbon_area = np.pi * (connection_radii - nafion_thickness)**2
         self.nafion_area = np.pi * connection_radii**2 - self.carbon_area
 
@@ -78,16 +81,16 @@ class SimpleLatticedCatalystLayer(object):
 
     @property
     def thermal_conductances(self):
-        t_C = 0.5 * W / K / m * 100 # thermal conductivity of carbon
+        t_C = 0.5 * W / K / m # thermal conductivity of carbon
         return -t_C * self.carbon_area / self.lengths
 
     @property
     def diffusive_conductances(self):
-        D_b = 2.02E-5 * m**2 / s / 1E3 # binary diffusion coefficient
+        D_b = 2.02E-5 * m**2 / s # binary diffusion coefficient
         c = self.pressure / ( R * 353*K )
 
-        g_half = np.pi * self.geometry.spheres.radii.squeeze()*m * c * D_b
-        g_cyl = self.geometry.cylinders.areas / self.geometry.cylinders.heights.squeeze()*m * c * D_b
+        g_half = np.pi * self.geometry.spheres.radii*m * c * D_b
+        g_cyl = self.geometry.cylinders.areas / self.geometry.cylinders.heights*m * c * D_b
 
         gis, gjs = g_half.quantity[self.geometry.pairs.T] * g_half.units
         g_D = (1 / gis + 1 / g_cyl + 1 / gjs)**-1
@@ -99,18 +102,7 @@ class SimpleLatticedCatalystLayer(object):
 
     @property
     def orr(self):
-        '''
-        Butler-Volmer
-        '''
-        j0 = 1.8E-2 * A / m**2 
-        alf = 0.5
-        T = self.temperature
-        n = self.overpotential
-        E1 = np.exp(   2 *   alf   * F / (R * T) * n )
-        E2 = np.exp( - 2 * (1-alf) * F / (R * T) * n )
-        AO2 = self.oxygen_molar_fraction
-        j_orr = -j0 * AO2 * ( E1 - E2 )
-        return j_orr / 1000000
+        return self.output_current_density
 
     def solve_systems(self, input_current_density, bval):
         x,y,z = self.geometry.coords
@@ -119,17 +111,23 @@ class SimpleLatticedCatalystLayer(object):
 
         local_current = input_current_density * self.pore_agglomerate_area
 
-        self.electronic_potential = self.electron_transport.solve( { bval*V : gdl }, -local_current )
-        self.protonic_potential = self.proton_transport.solve( { 0*V : membrane }, local_current )
+        self.electronic_potential = self.electron_transport.solve( { bval*V : gdl }, local_current )
+        self.protonic_potential = self.proton_transport.solve( { 0*V : membrane }, -local_current )
 
         E0 = 1.223 * V
         self.overpotential = self.electronic_potential - self.protonic_potential - E0
 
         heat_generation = local_current * self.overpotential
-        self.temperature = self.heat_transport.solve( { 353*K : gdl }, heat_generation )
+        self.temperature = self.heat_transport.solve( { 353*K : gdl } )
 
-        oxygen_molar_consumption = local_current / (4 * F)
-        self.oxygen_molar_fraction = self.gas_transport.solve( { 0.21 : gdl }, oxygen_molar_consumption )
+        T = self.temperature
+        n = self.overpotential
+        j0 = 1.8E-2 * A / m**2
+        alf = 0.5
+        E1 = np.exp(   2 *   alf   * F / (R * T) * n )
+        E2 = np.exp( - 2 * (1-alf) * F / (R * T) * n )
+        k = j0 * (E1 + E2) * 1E-20
+        self.oxygen_molar_fraction = self.gas_transport.solve( { 0.21 : gdl }, k=np.where(gdl, 0, k.quantity) * mol/s)
 
-        output_current_density = self.orr
-        return output_current_density
+        self.output_current_density = np.where( membrane | gdl, 0, self.oxygen_molar_fraction * k.quantity) * 1E11 * A/cm**2
+        return self.output_current_density
