@@ -93,28 +93,29 @@ class System(object):
     every time, for fast iterations over changing environmental conditions
     '''
     def __init__(self, pairs, conductances, flux=1, potential=1):
+        # this may be handled better in the future, but these are unit defs
         self.fu = flux
         self.pu = potential
 
-        # create diags
+        # create nodes / diags
         self.n = n = np.max(pairs) + 1 # we need a better heuristic for stragglers
         diags = np.arange(n) + 1 # otherwise the csr conversion drops the 0 (1)
         D = sparse.diags(diags, 0)
 
-        # create rest
+        # create rest / adjacency matrix
         self.m = m = len(pairs)
         k = np.arange(n, n+m) + 1
         j, i = np.transpose(pairs)
         ijk = k, (i, j)
         A = sparse.coo_matrix(ijk, shape=(n, n))
 
-        # quick recall map
+        # creation of a mapping that associates nodes and neighbors
         self.mapping = [[] for _ in diags]
         for row, idx in zip(A.row, A.data-1):
             self.mapping[row].append( idx )
         self.mapping = np.array(self.mapping)
 
-        # combine to master
+        # combine sparse matrices for the master copy
         self._adj = (A + D)
         self._adj.data -= 1 # recover proper indexing from (1)
 

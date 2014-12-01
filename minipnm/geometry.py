@@ -38,11 +38,11 @@ class Spheres(GeometryInterface):
 
     @property
     def areas(self):
-        return (4 * np.pi * self.radii**2).squeeze()
+        return (4 * np.pi * self.radii**2)
 
     @property
     def volumes(self):
-        return (4./3. * np.pi * self.radii**3).squeeze()
+        return (4./3. * np.pi * self.radii**3)
 
 
 class Cylinders(GeometryInterface):
@@ -56,7 +56,7 @@ class Cylinders(GeometryInterface):
         '''
         pairs = self.parent.pairs
         sphere_centers = self.parent.spheres.centers
-        sphere_radii = self.parent.spheres.radii
+        sphere_radii = self.parent.spheres.radii.reshape(-1,1) # transpose
         # assign radii
         self.radii = sphere_radii[pairs].min(axis=1)/f
 
@@ -98,16 +98,16 @@ class Cylinders(GeometryInterface):
         distance = np.linalg.norm(center - closest_point, axis=1)
         rad2rad = radius + self.radii.T
         clear = (cap_condition & (distance > radius-0.01)) | (distance > rad2rad)
-        return ~clear.squeeze()
+        return ~clear
 
     @property
     def heights(self):
-        return np.linalg.norm(self.spans, axis=1).reshape(-1, 1)
+        return np.linalg.norm(self.spans, axis=1)
 
     @property
     def areas(self):
-        return (2 * np.pi * self.radii * self.heights).squeeze()
+        return (2 * np.pi * self.radii * self.heights)
 
     @property
     def volumes(self):
-        return (np.pi * self.radii**2 * self.heights).squeeze()
+        return (np.pi * self.radii**2 * self.heights)

@@ -41,7 +41,7 @@ def property_from(list_of_keys, dtype=None, default=None):
     Gives the option of setting a dtype for casting
     '''
     def getter(self):
-        return np.vstack([self.get(key, default) for key in list_of_keys]).T
+        return np.vstack([self.get(key, default) for key in list_of_keys]).T.squeeze()
 
     def setter(self, values):
         values = np.nan_to_num(np.array(values)).reshape(-1, len(list_of_keys))

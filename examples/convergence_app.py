@@ -9,7 +9,7 @@ import minipnm as mini
 import MKS
 MKS.define(globals())
 
-class Walker(QtGui.QMainWindow):\
+class Walker(QtGui.QMainWindow):
 
     def __init__(self):
         super(Walker, self).__init__()
@@ -31,7 +31,7 @@ class Walker(QtGui.QMainWindow):\
 
     def initCatalyst(self):
         shape = [100, 1, 1]
-        t = 0.725 * um # thickness
+        t = 15.25 * um # thickness
         P = 1.5E5 * Pa
 
         self.cl = mini.models.SimpleLatticedCatalystLayer(shape, t, 0.422, P)
