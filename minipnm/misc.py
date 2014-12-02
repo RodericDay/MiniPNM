@@ -9,24 +9,6 @@ misc houses scientific tools and helpers
 class distributions:
     uniform = (1 for _ in iter(int,1))
 
-def mid(array):
-    center = (array.max() - array.min())/2.
-    return array[bisect.bisect_left(array, center)]
-
-def normalize(array):
-    array = np.atleast_1d(array)
-    array = np.subtract(array, array.min())
-    array = np.true_divide(array, array.max())
-    return array
-
-def laplacian(A):
-    '''
-    this is the graph theory version of the Laplacian matrix, given
-    a value-weighted adjacency matrix A
-    '''
-    D = sparse.diags(A.sum(axis=1).A1, 0)
-    return D - A
-
 def flux(adj, values):
     adj.data = abs(values[adj.col] - values[adj.row])
     return adj.mean(axis=1).A1

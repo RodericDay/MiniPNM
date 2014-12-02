@@ -92,7 +92,7 @@ class System(object):
     application of boundary conditions without rebuilding the entire matrix
     every time, for fast iterations over changing environmental conditions
     '''
-    def __init__(self, pairs, conductances, flux=1, potential=1):
+    def __init__(self, pairs, flux=1, potential=1, conductances=None):
         # this may be handled better in the future, but these are unit defs
         self.fu = flux
         self.pu = potential
@@ -123,7 +123,8 @@ class System(object):
         # matrix in csr form
         self.reindex = np.argsort(self._adj.data)
 
-        self.conductances = conductances
+        if conductances is not None:
+            self.conductances = conductances
 
     @property
     def conductances(self):
