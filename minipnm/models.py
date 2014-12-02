@@ -1,3 +1,4 @@
+import logging
 import numpy as np
 from scipy import optimize
 import minipnm as mini
@@ -7,52 +8,85 @@ MKS.define(globals())
 
 class SimpleLatticedCatalystLayer(object):
     
-    def __init__(self, grid_shape, thickness, porosity, pressure):
-        topology = mini.Cubic(grid_shape)
-        scale = thickness(m) / topology.bbox[0]
-        topology.points *= scale
-        self.pressure = pressure
+    def __init__(self, thickness, radii, porosity):
+        '''
+        given parameters, aim for a 10,000 pore model
+        '''
+        N = 2000
+        scale = 3 * radii
+        nx = thickness / ( 3 * radii )
+        nz = ny = int(np.sqrt(N / nx))
+        self.topology = mini.Cubic([nx, ny, nz], scale(m))
+        logging.info("\nPore-phase topology generated"
+                     "\n\t{0.order} pores, {0.size} throats"
+                     "\n\tgoal thickness: {thickness.quantity}"
+                     "\n\tbbox:           {0.bbox}"
+                     "".format(self.topology, **locals()) )
 
-        # quickfit for porosity
-        def objf(r):
-            geometry = mini.Radial(topology.points, abs(r), topology.pairs, prune=False)
-            return geometry.porosity()
-        def minf(r):
-            return abs(porosity - objf(r))
-        r = abs(optimize.minimize_scalar(minf).x)
+        self.geometry = mini.Radial(self.topology.points, radii(m), self.topology.pairs, prune=False)
+        # fit the porosity by tweaking the throat factor
+        self.geometry.cylinders.radii *= 1.578
+        porosity = self.geometry.porosity()
+        # we should do a couple of checks here:
+        # - no radial collisions
+        # - no throats wider than pores
+        avg_throat_length = self.geometry.cylinders.heights.mean() * (m / nm)
+        avg_throat_radius = self.geometry.cylinders.radii.mean() * (m / nm)
+        logging.info("\nPore-phase geometry generated"
+                     "\n\tporosity:          {porosity}"
+                     "\n\tavg throat len:    {avg_throat_length} nm"
+                     "\n\tavg throat radius: {avg_throat_radius} nm"
+                     "".format(self.geometry, **locals()) )
 
-        self.geometry = mini.Radial(topology.points, r, topology.pairs)
+        self.electron_transport = mini.bvp.System(self.geometry.pairs, A, V )
+        self.proton_transport = mini.bvp.System(self.geometry.pairs, A, V )
+        self.heat_transport = mini.bvp.System(self.geometry.pairs, W, K )
+        self.gas_transport = mini.bvp.System(self.geometry.pairs, mol/s, 1 )
+        logging.info("\nTransports set up")
 
-        if any(self.geometry.spheres.radii < 10E-9):
-            raise Exception("some radii are smaller than 10 nm")
-
-    def generate_agglomerate(self, specific_surface_area, nafion_thickness):
-        self.specific_surface_area = specific_surface_area
-        connection_radii = self.geometry.cylinders.radii * m
-        self.carbon_area = np.pi * (connection_radii - nafion_thickness)**2
-        self.nafion_area = np.pi * connection_radii**2 - self.carbon_area
-
-    def generate_systems(self):
-        self.electron_transport = mini.bvp.System(self.geometry.pairs, self.electronic_conductances, A, V )
-        self.proton_transport = mini.bvp.System(self.geometry.pairs, self.protonic_conductances, A, V )
-        self.heat_transport = mini.bvp.System(self.geometry.pairs, self.thermal_conductances, W, K )
-        self.gas_transport = mini.bvp.System(self.geometry.pairs, self.diffusive_conductances, mol/s, 1 )
+        x, y, z = self.topology.coords
+        self.membrane = x==x.min()
+        self.gdl = x==x.max()
 
     @property
     def npores(self):
-        return self.geometry.order
+        return self.topology.order
 
     @property
     def depth(self):
         return self.geometry['x'] * m
 
     @property
-    def lengths(self):
-        return self.geometry.lengths * m
+    def node_to_node_lengths(self):
+        return self.topology.lengths * m
 
     @property
     def pore_surface_area(self):
         return self.geometry.spheres.areas * m**2
+
+    @property
+    def geometric_surface_area(self):
+        t, h, w = self.geometry.bbox * m
+        return h * w
+
+    # AGGLOM RELATED
+
+    def generate_agglomerate(self, specific_surface_area, nafion_thickness):
+        self.specific_surface_area = specific_surface_area
+        connection_radii = self.geometry.cylinders.radii * m
+        self.carbon_area = np.pi * (connection_radii - nafion_thickness)**2
+        self.nafion_area = np.pi * connection_radii**2 - self.carbon_area
+        max_ratio = (nafion_thickness / connection_radii).max()
+        logging.info("\nAgglomerate generated"
+                     "\n\tavg nafion thickness: {0.average_nafion_thickness}"
+                     "\n\tmax N / C ratio: {max_ratio}"
+                     "".format(self, **locals()))
+
+    @property
+    def average_nafion_thickness(self):
+        outer_rad = self.geometry.cylinders.radii * m
+        inner_rad = (self.carbon_area / np.pi)**0.5
+        return (outer_rad - inner_rad)(nm).mean()
 
     @property
     def total_agglomerate_area(self):
@@ -63,31 +97,29 @@ class SimpleLatticedCatalystLayer(object):
         proportion = self.pore_surface_area / self.pore_surface_area.sum()
         return self.total_agglomerate_area * proportion
 
-    @property
-    def geometric_surface_area(self):
-        t, h, w = self.geometry.bbox * m
-        return h * w
+    # USER DEFINED:
 
     @property
     def electronic_conductances(self):
         s_C = 1000 * S / m # electric conductivity of carbon
-        return -s_C * self.carbon_area / self.lengths
+        return -s_C * self.carbon_area / self.node_to_node_lengths
 
     @property
     def protonic_conductances(self):
         # s_N = 100 * np.exp( ( 15.036 * 1 - 15.811) * 1000*K/T + (-30.726 * 1 + 30.481) ) * S / m
         s_N = 10 * S / m # protonic conductivity of nafion
-        return -s_N * self.nafion_area / self.lengths
+        return -s_N * self.nafion_area / self.node_to_node_lengths
 
     @property
     def thermal_conductances(self):
         t_C = 0.5 * W / K / m # thermal conductivity of carbon
-        return -t_C * self.carbon_area / self.lengths
+        return -t_C * self.carbon_area / self.node_to_node_lengths
 
     @property
     def diffusive_conductances(self):
         D_b = 2.02E-5 * m**2 / s # binary diffusion coefficient
-        c = self.pressure / ( R * 353*K )
+        P = 1 * atm
+        c = P / ( R * 353*K )
 
         g_half = np.pi * self.geometry.spheres.radii*m * c * D_b
         g_cyl = self.geometry.cylinders.areas / self.geometry.cylinders.heights*m * c * D_b
@@ -96,38 +128,62 @@ class SimpleLatticedCatalystLayer(object):
         g_D = (1 / gis + 1 / g_cyl + 1 / gjs)**-1
         return g_D
 
-    def measured_current_density(self, local_current_density):
-        total_current_generated = (local_current_density * self.pore_agglomerate_area).sum()
-        return total_current_generated / self.geometric_surface_area
-
-    @property
-    def orr(self):
-        return self.output_current_density
-
-    def solve_systems(self, input_current_density, bval):
-        x,y,z = self.geometry.coords
-        membrane = x == x.min()
-        gdl = x == x.max()
-
-        local_current = input_current_density * self.pore_agglomerate_area
-
-        self.electronic_potential = self.electron_transport.solve( { bval*V : gdl }, local_current )
-        self.protonic_potential = self.proton_transport.solve( { 0*V : membrane }, -local_current )
-
+    def overpotential(self):
         E0 = 1.223 * V
-        self.overpotential = self.electronic_potential - self.protonic_potential - E0
+        return self.electronic_potential() - self.protonic_potential() - E0
 
-        heat_generation = local_current * self.overpotential
-        self.temperature = self.heat_transport.solve( { 353*K : gdl } )
-
-        T = self.temperature
-        n = self.overpotential
+    def reaction_rate(self, T, n):
+        '''
+        Butler-Volmer
+        '''
         j0 = 1.8E-2 * A / m**2
         alf = 0.5
         E1 = np.exp(   2 *   alf   * F / (R * T) * n )
         E2 = np.exp( - 2 * (1-alf) * F / (R * T) * n )
-        k = j0 * (E1 + E2) * 1E-20
-        self.oxygen_molar_fraction = self.gas_transport.solve( { 0.21 : gdl }, k=np.where(gdl, 0, k.quantity) * mol/s)
+        return j0 * (E1 + E2) * 1E-20
 
-        self.output_current_density = np.where( membrane | gdl, 0, self.oxygen_molar_fraction * k.quantity) * 1E11 * A/cm**2
-        return self.output_current_density
+    # A BIT MORE ABSTRACTED
+
+    def electronic_potential(self):
+        self.electron_transport.conductances = self.electronic_conductances
+        return self.electron_transport.solve(
+            { self.measured_voltage : self.gdl }, self.local_current )
+
+    def protonic_potential(self):
+        self.proton_transport.conductances = self.protonic_conductances
+        return self.proton_transport.solve(
+            { 0*V : self.membrane }, -self.local_current )
+
+    def temperature(self):
+        return 333 * K
+
+    def oxygen_molar_fraction(self, k):
+        self.gas_transport.conductances = self.diffusive_conductances
+        return self.gas_transport.solve(
+            { 0.21 : self.gdl }, k=np.where(self.gdl, 0, k.quantity) * mol/s)
+
+    @property
+    def measured_current_density(self):
+        valid = ~(self.gdl | self.membrane)
+        total_current_generated = (valid*self.local_current).sum()
+        return total_current_generated / self.geometric_surface_area
+
+    # SOLVER METHODS
+
+    def polarization_curve(self, voltage_range):
+        current_densities = []
+        for voltage in voltage_range:
+            self.reach_steady_state(v=voltage, j=0*A/m**2)
+            current_densities.append( self.measured_current_density(A/m**2) )
+        return np.array(current_densities) * A/m**2
+
+    def reach_steady_state(self, v, j):
+        self.measured_voltage = v
+        self.local_current = j * self.pore_agglomerate_area
+        for i in range(2):
+            n = self.overpotential()
+            T = self.temperature()
+            k = self.reaction_rate(T, n)
+            x = self.oxygen_molar_fraction(k)
+            j = k*x
+            self.local_current = j * self.pore_agglomerate_area
