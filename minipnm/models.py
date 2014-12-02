@@ -7,15 +7,26 @@ MKS.define(globals())
 
 
 class SimpleLatticedCatalystLayer(object):
-    
-    def __init__(self, thickness, radii, porosity):
+
+    @classmethod
+    def test(cls):
+        # voltages = np.arange(0, 1.3, 0.1) * V
+        radii = 50*nm
+        porosity = 0.4
+        thickness = 5*um
+        cl = cls(thickness, radii, porosity, flat=True)
+        cl.generate_agglomerate(200*cm**2/cm**2, 10*nm)
+        return cl
+
+    def __init__(self, thickness, radii, porosity, N=2000, flat=False):
         '''
         given parameters, aim for a 10,000 pore model
         '''
-        N = 2000
         scale = 3 * radii
-        nx = thickness / ( 3 * radii )
+        nx = int( thickness / ( 3 * radii ) )
         nz = ny = int(np.sqrt(N / nx))
+        if flat is True:
+            nz = 1
         self.topology = mini.Cubic([nx, ny, nz], scale(m))
         logging.info("\nPore-phase topology generated"
                      "\n\t{0.order} pores, {0.size} throats"
@@ -173,17 +184,26 @@ class SimpleLatticedCatalystLayer(object):
     def polarization_curve(self, voltage_range):
         current_densities = []
         for voltage in voltage_range:
-            self.reach_steady_state(v=voltage, j=0*A/m**2)
+            self.reach_steady_state(v=voltage)
             current_densities.append( self.measured_current_density(A/m**2) )
         return np.array(current_densities) * A/m**2
 
-    def reach_steady_state(self, v, j):
+    def reach_steady_state(self, v, j=0*A/m**2, max_iter=100):
         self.measured_voltage = v
         self.local_current = j * self.pore_agglomerate_area
-        for i in range(2):
+        for _ in range(max_iter):
             n = self.overpotential()
             T = self.temperature()
             k = self.reaction_rate(T, n)
             x = self.oxygen_molar_fraction(k)
             j = k*x
-            self.local_current = j * self.pore_agglomerate_area
+            new_local_current = j * self.pore_agglomerate_area
+            # insufficient convergence criterion
+            steady_state = np.allclose(new_local_current.quantity, self.local_current.quantity)
+            self.local_current = new_local_current
+            if steady_state:
+                # return x cause it's a bit tricky to get otherwise, and
+                # good for sanity checks
+                return x
+        else:
+            raise Exception("Steady state not reached")

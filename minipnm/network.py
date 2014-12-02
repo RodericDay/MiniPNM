@@ -317,6 +317,8 @@ class Cubic(Network):
             self.points *= scaling
         if any(self.bbox==0):
             # shift up to mid for 0-dimensional planes
+            if bbox is None:
+                bbox = self.bbox
             self.points += np.where( self.bbox==0, np.array(bbox)/2., 0 )
 
         I = np.arange(arr.size).reshape(arr.shape)
