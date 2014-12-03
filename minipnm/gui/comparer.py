@@ -40,20 +40,28 @@ class SceneWidget(QtGui.QFrame):
             return
         pointIds = glyph3D.GetOutput().GetPointData().GetArray("InputPointIds")
         selectedId = int(pointIds.GetTuple1(self.picker.GetPointId()))
-
-        # actor.callable(selectedId)
         actor.polydata.Modified()
 
         model.water_transport[selectedId] = ~model.water_transport[selectedId]
         history.script[:] = model.geometry.spheres.radii*2 * model.water_transport[:] # update graphx
         history.update()
+
+        # actor.callable(selectedId)
         currents = model.polarization_curve(voltages)
-        x = model.reach_steady_state(variableLine.value()*V)
-        wires.script[:] = x * 10
-        wires.update()
-        line.setData(x=currents(A/m**2), y=line.yData) #autoupdates :)
+        polarizationCurve.setData(x=currents(A/m**2), y=polarizationCurve.yData) #autoupdates :)
         
-        self.interactor.GetRenderWindow().Render()
+        self.updateLight()
+
+    def updateLight(self):
+        t = model.topology.coords[0]
+        y = model.reach_steady_state(variableLine.value()*V)
+        y[0] = 0 # stupid way of stopping auto-range from messing things
+        transversalCurve.setData(t, y)
+
+        wires.script[:] = y * 10
+        wires.update()
+
+        self.interactor.GetRenderWindow().Render()     
 
 
 class Main(QtGui.QMainWindow):
@@ -64,7 +72,7 @@ class Main(QtGui.QMainWindow):
         self.toolBar.addAction("X", app.quit).setShortcut("Q")
         self.widget = QtGui.QWidget()
         self.setCentralWidget(self.widget)
-        self.layout = QtGui.QVBoxLayout(self.widget)
+        self.layout = QtGui.QGridLayout(self.widget)
 
 
 if __name__ == '__main__':
@@ -78,25 +86,32 @@ if __name__ == '__main__':
     model = mini.models.SimpleLatticedCatalystLayer.test()
     print model.npores
     spheres, tubes, history = model.geometry.actors(model.water_transport)
-    wires, = model.topology.actors(offset=model.topology.bbox*[0,-1.1,0], cmap='summer_r', vmin=0, vmax=21)
+    wires, = model.topology.actors(offset=model.topology.bbox*[0,-1.1,0])
 
     sceneFrame = SceneWidget()
     sceneFrame.addActors([spheres, tubes, history])
     sceneFrame.addActors([wires])
 
-    plotWidget = QtGraph.PlotWidget()
-    plotWidget.setMouseEnabled(False, False)
-    variableLine = plotWidget.addLine(y=0.75, movable=True)
+    polarizationCurveWidget = QtGraph.PlotWidget()
+    polarizationCurveWidget.setMouseEnabled(False, False)
+    variableLine = polarizationCurveWidget.addLine(y=0.6, movable=True)
+    variableLine.sigPositionChanged.connect(sceneFrame.updateLight)
 
     voltages = np.arange(0, 1.5, 0.1) * V
     currents = model.polarization_curve(voltages)
-    plotWidget.plot( currents(A/m**2), voltages(V), pen='g' )
-    line = plotWidget.plot( currents(A/m**2), voltages(V), pen='r' )
+    polarizationCurveWidget.plot( currents(A/m**2), voltages(V), pen='g' )
+    polarizationCurve = polarizationCurveWidget.plot( currents(A/m**2), voltages(V), pen='r' )
+
+    transversalCurveWidget = QtGraph.PlotWidget()
+    transversalCurveWidget.setMouseEnabled(False, False)
+    transversalCurve = transversalCurveWidget.plot( [0,1], [1,0], pen=None, symbol='o' )
 
     main = Main()
-    main.layout.addWidget(sceneFrame)
-    main.layout.addWidget(plotWidget)
+    main.layout.addWidget(sceneFrame, 0, 0)
+    main.layout.addWidget(transversalCurveWidget, 0, 1)
+    main.layout.addWidget(polarizationCurveWidget, 1, 0, 1, 2)
     main.show()
     sceneFrame.interactor.Initialize()
+    sceneFrame.updateLight()
 
     app.exec_()

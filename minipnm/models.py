@@ -28,6 +28,8 @@ class SimpleLatticedCatalystLayer(object):
         if flat is True:
             ny = N // nx
             nz = 1
+        nx /= 2
+        ny *= 2
         self.topology = mini.Cubic([nx, ny, nz], scale(m))
         logging.info("\nPore-phase topology generated"
                      "\n\t{0.order} pores, {0.size} throats"
@@ -35,6 +37,7 @@ class SimpleLatticedCatalystLayer(object):
                      "\n\tbbox:           {0.bbox}"
                      "".format(self.topology, **locals()) )
 
+        radii = np.random.uniform( 0.5*radii(m), 1.2*radii(m), self.topology.order) * m
         self.geometry = mini.Radial(self.topology.points, radii(m), self.topology.pairs, prune=False)
         # fit the porosity by tweaking the throat factor
         self.geometry.cylinders.radii *= 1.578
@@ -132,7 +135,8 @@ class SimpleLatticedCatalystLayer(object):
     def diffusive_conductances(self):
         D_b = 2.02E-5 * m**2 / s # binary diffusion coefficient
         P = 1 * atm
-        c = P / ( R * 353*K )
+        T = self.temperature()
+        c = P / ( R * T )
 
         g_half = np.pi * self.geometry.spheres.radii*m * c * D_b
         g_cyl = self.geometry.cylinders.areas / self.geometry.cylinders.heights*m * c * D_b
@@ -151,11 +155,12 @@ class SimpleLatticedCatalystLayer(object):
         '''
         Butler-Volmer
         '''
+        f = self.pore_agglomerate_area / F
         j0 = 1.8E-2 * A / m**2
         alf = 0.5
         E1 = np.exp(   2 *   alf   * F / (R * T) * n )
         E2 = np.exp( - 2 * (1-alf) * F / (R * T) * n )
-        return j0 * (E1 + E2) * 1E-20
+        return j0 * (E1 + E2) * f
 
     @property
     def throat_saturation(self):
@@ -179,8 +184,7 @@ class SimpleLatticedCatalystLayer(object):
 
     def oxygen_molar_fraction(self, k):
         self.gas_transport.conductances = self.diffusive_conductances
-        return self.gas_transport.solve(
-            { 0.21 : self.gdl }, k=np.where(self.gdl, 0, k.quantity) * mol/s)
+        return self.gas_transport.solve( { 0.21 : self.gdl }, k=k*~self.gdl)
 
     @property
     def measured_current_density(self):
@@ -205,7 +209,7 @@ class SimpleLatticedCatalystLayer(object):
             T = self.temperature()
             k = self.reaction_rate(T, n)
             x = self.oxygen_molar_fraction(k)
-            j = k*x
+            j = k*x * ( (A/m**2) / (mol/s) )
             new_local_current = j * self.pore_agglomerate_area
             # insufficient convergence criterion
             steady_state = np.allclose(new_local_current.quantity, self.local_current.quantity)
