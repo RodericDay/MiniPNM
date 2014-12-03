@@ -18,7 +18,7 @@ class SimpleLatticedCatalystLayer(object):
         cl.generate_agglomerate(200*cm**2/cm**2, 10*nm)
         return cl
 
-    def __init__(self, thickness, radii, porosity, N=2000, flat=False):
+    def __init__(self, thickness, radii, porosity, N=200, flat=False):
         '''
         given parameters, aim for a 10,000 pore model
         '''
@@ -26,6 +26,7 @@ class SimpleLatticedCatalystLayer(object):
         nx = int( thickness / ( 3 * radii ) )
         nz = ny = int(np.sqrt(N / nx))
         if flat is True:
+            ny = N // nx
             nz = 1
         self.topology = mini.Cubic([nx, ny, nz], scale(m))
         logging.info("\nPore-phase topology generated"
@@ -53,6 +54,7 @@ class SimpleLatticedCatalystLayer(object):
         self.proton_transport = mini.bvp.System(self.geometry.pairs, A, V )
         self.heat_transport = mini.bvp.System(self.geometry.pairs, W, K )
         self.gas_transport = mini.bvp.System(self.geometry.pairs, mol/s, 1 )
+        self.water_transport = np.zeros(self.npores, dtype=bool)
         logging.info("\nTransports set up")
 
         x, y, z = self.topology.coords
@@ -137,7 +139,9 @@ class SimpleLatticedCatalystLayer(object):
 
         gis, gjs = g_half.quantity[self.geometry.pairs.T] * g_half.units
         g_D = (1 / gis + 1 / g_cyl + 1 / gjs)**-1
-        return g_D
+
+        S = np.where(self.throat_saturation, 1, 0)
+        return g_D * (1 - S)
 
     def overpotential(self):
         E0 = 1.223 * V
@@ -152,6 +156,11 @@ class SimpleLatticedCatalystLayer(object):
         E1 = np.exp(   2 *   alf   * F / (R * T) * n )
         E2 = np.exp( - 2 * (1-alf) * F / (R * T) * n )
         return j0 * (E1 + E2) * 1E-20
+
+    @property
+    def throat_saturation(self):
+        # saturated if either node is
+        return self.water_transport[self.geometry.pairs].any(axis=1)
 
     # A BIT MORE ABSTRACTED
 
@@ -175,7 +184,7 @@ class SimpleLatticedCatalystLayer(object):
 
     @property
     def measured_current_density(self):
-        valid = ~(self.gdl | self.membrane)
+        valid = ~(self.gdl | self.membrane) # axes tails
         total_current_generated = (valid*self.local_current).sum()
         return total_current_generated / self.geometric_surface_area
 

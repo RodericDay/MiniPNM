@@ -41,11 +41,17 @@ class SceneWidget(QtGui.QFrame):
         pointIds = glyph3D.GetOutput().GetPointData().GetArray("InputPointIds")
         selectedId = int(pointIds.GetTuple1(self.picker.GetPointId()))
 
-        actor.callable(selectedId)
+        # actor.callable(selectedId)
         actor.polydata.Modified()
 
+        model.water_transport[selectedId] = ~model.water_transport[selectedId]
+        history.script[:] = model.geometry.spheres.radii*2 * model.water_transport[:] # update graphx
+        history.update()
         currents = model.polarization_curve(voltages)
-        line.setData(x=currents(A/m**2), y=line.yData)
+        x = model.reach_steady_state(variableLine.value()*V)
+        wires.script[:] = x * 10
+        wires.update()
+        line.setData(x=currents(A/m**2), y=line.yData) #autoupdates :)
         
         self.interactor.GetRenderWindow().Render()
 
@@ -70,11 +76,17 @@ if __name__ == '__main__':
     app = QtGui.QApplication([])
     
     model = mini.models.SimpleLatticedCatalystLayer.test()
+    print model.npores
+    spheres, tubes, history = model.geometry.actors(model.water_transport)
+    wires, = model.topology.actors(offset=model.topology.bbox*[0,-1.1,0], cmap='summer_r', vmin=0, vmax=21)
 
     sceneFrame = SceneWidget()
-    sceneFrame.addActors(model.geometry.actors())
+    sceneFrame.addActors([spheres, tubes, history])
+    sceneFrame.addActors([wires])
 
     plotWidget = QtGraph.PlotWidget()
+    plotWidget.setMouseEnabled(False, False)
+    variableLine = plotWidget.addLine(y=0.75, movable=True)
 
     voltages = np.arange(0, 1.5, 0.1) * V
     currents = model.polarization_curve(voltages)

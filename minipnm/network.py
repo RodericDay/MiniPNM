@@ -268,7 +268,7 @@ class Network(dict):
         if not wait:
             scene.play()
 
-    def actors(self, values=None, **kwargs):
+    def actors(self, values=None, offset=[0, 0, 0], **kwargs):
         try:
             # to load as if given a key
             values = self[values]
@@ -281,7 +281,7 @@ class Network(dict):
             # probably an array, but make sure it fits!
             assert np.array(values).shape[-1] == self.order
         finally:
-            wires = graphics.Wires(self.points, self.pairs, values, **kwargs)
+            wires = graphics.Wires(self.points+offset, self.pairs, values, **kwargs)
         return [wires]
 
     def plot(self, *values):
