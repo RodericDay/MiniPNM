@@ -56,6 +56,9 @@ class SceneWidget(QtGui.QFrame):
         t = model.topology.coords[0]
         y = model.reach_steady_state(variableLine.value()*V)
         y[0] = 0 # stupid way of stopping auto-range from messing things
+        attributeString = str(comboBox.currentText())
+        if attributeString != 'oxygen_molar_fraction':
+            y = getattr(model, attributeString).quantity
         transversalCurve.setData(t, y)
 
         wires.script[:] = y * 10
@@ -87,6 +90,8 @@ if __name__ == '__main__':
     print model.npores
     spheres, tubes, history = model.geometry.actors(model.water_transport)
     wires, = model.topology.actors(offset=model.topology.bbox*[0,-1.1,0])
+    voltages = np.arange(0, 1.5, 0.1) * V
+    currents = model.polarization_curve(voltages)
 
     sceneFrame = SceneWidget()
     sceneFrame.addActors([spheres, tubes, history])
@@ -94,19 +99,22 @@ if __name__ == '__main__':
 
     polarizationCurveWidget = QtGraph.PlotWidget()
     polarizationCurveWidget.setMouseEnabled(False, False)
-    variableLine = polarizationCurveWidget.addLine(y=0.6, movable=True)
-    variableLine.sigPositionChanged.connect(sceneFrame.updateLight)
-
-    voltages = np.arange(0, 1.5, 0.1) * V
-    currents = model.polarization_curve(voltages)
     polarizationCurveWidget.plot( currents(A/m**2), voltages(V), pen='g' )
     polarizationCurve = polarizationCurveWidget.plot( currents(A/m**2), voltages(V), pen='r' )
+    variableLine = polarizationCurveWidget.addLine(y=0.6, movable=True)
+    variableLine.sigPositionChanged.connect(sceneFrame.updateLight)
 
     transversalCurveWidget = QtGraph.PlotWidget()
     transversalCurveWidget.setMouseEnabled(False, False)
     transversalCurve = transversalCurveWidget.plot( [0,1], [1,0], pen=None, symbol='o' )
 
+    comboBox = QtGui.QComboBox()
+    comboBox.addItems(['oxygen_molar_fraction','protonic_potential',
+                        'electronic_potential','overpotential','local_current'])
+    comboBox.currentIndexChanged.connect(sceneFrame.updateLight)
+
     main = Main()
+    main.toolBar.addWidget(comboBox)
     main.layout.addWidget(sceneFrame, 0, 0)
     main.layout.addWidget(transversalCurveWidget, 0, 1)
     main.layout.addWidget(polarizationCurveWidget, 1, 0, 1, 2)

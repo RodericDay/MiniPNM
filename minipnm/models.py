@@ -135,7 +135,7 @@ class SimpleLatticedCatalystLayer(object):
     def diffusive_conductances(self):
         D_b = 2.02E-5 * m**2 / s # binary diffusion coefficient
         P = 1 * atm
-        T = self.temperature()
+        T = self.temperature
         c = P / ( R * T )
 
         g_half = np.pi * self.geometry.spheres.radii*m * c * D_b
@@ -147,9 +147,10 @@ class SimpleLatticedCatalystLayer(object):
         S = np.where(self.throat_saturation, 1, 0)
         return g_D * (1 - S)
 
+    @property
     def overpotential(self):
         E0 = 1.223 * V
-        return self.electronic_potential() - self.protonic_potential() - E0
+        return self.electronic_potential - self.protonic_potential - E0
 
     def reaction_rate(self, T, n):
         '''
@@ -169,22 +170,25 @@ class SimpleLatticedCatalystLayer(object):
 
     # A BIT MORE ABSTRACTED
 
+    @property
     def electronic_potential(self):
         self.electron_transport.conductances = self.electronic_conductances
         return self.electron_transport.solve(
             { self.measured_voltage : self.gdl }, self.local_current )
 
+    @property
     def protonic_potential(self):
         self.proton_transport.conductances = self.protonic_conductances
         return self.proton_transport.solve(
             { 0*V : self.membrane }, -self.local_current )
 
+    @property
     def temperature(self):
         return 333 * K
 
     def oxygen_molar_fraction(self, k):
         self.gas_transport.conductances = self.diffusive_conductances
-        return self.gas_transport.solve( { 0.21 : self.gdl }, k=k*~self.gdl)
+        return self.gas_transport.solve( { 0.21 : self.gdl }, k=k)
 
     @property
     def measured_current_density(self):
@@ -198,15 +202,15 @@ class SimpleLatticedCatalystLayer(object):
         current_densities = []
         for voltage in voltage_range:
             self.reach_steady_state(v=voltage)
-            current_densities.append( self.measured_current_density(A/m**2) )
-        return np.array(current_densities) * A/m**2
+            current_densities.append( self.measured_current_density(A/cm**2) )
+        return np.array(current_densities) * A/cm**2
 
     def reach_steady_state(self, v, j=0*A/m**2, max_iter=100):
         self.measured_voltage = v
         self.local_current = j * self.pore_agglomerate_area
         for _ in range(max_iter):
-            n = self.overpotential()
-            T = self.temperature()
+            n = self.overpotential
+            T = self.temperature
             k = self.reaction_rate(T, n)
             x = self.oxygen_molar_fraction(k)
             j = k*x * ( (A/m**2) / (mol/s) )
