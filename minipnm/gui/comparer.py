@@ -48,7 +48,7 @@ class SceneWidget(QtGui.QFrame):
 
         # actor.callable(selectedId)
         currents = model.polarization_curve(voltages)
-        polarizationCurve.setData(x=currents(A/m**2), y=polarizationCurve.yData) #autoupdates :)
+        polarizationCurve.setData(x=currents(A/cm**2), y=polarizationCurve.yData) #autoupdates :)
         
         self.updateLight()
 
@@ -99,8 +99,8 @@ if __name__ == '__main__':
 
     polarizationCurveWidget = QtGraph.PlotWidget()
     polarizationCurveWidget.setMouseEnabled(False, False)
-    polarizationCurveWidget.plot( currents(A/m**2), voltages(V), pen='g' )
-    polarizationCurve = polarizationCurveWidget.plot( currents(A/m**2), voltages(V), pen='r' )
+    polarizationCurveWidget.plot( currents(A/cm**2), voltages(V), pen='g' )
+    polarizationCurve = polarizationCurveWidget.plot( currents(A/cm**2), voltages(V), pen='r' )
     variableLine = polarizationCurveWidget.addLine(y=0.6, movable=True)
     variableLine.sigPositionChanged.connect(sceneFrame.updateLight)
 

@@ -173,12 +173,14 @@ class SimpleLatticedCatalystLayer(object):
     @property
     def electronic_potential(self):
         self.electron_transport.conductances = self.electronic_conductances
+        return self.measured_voltage * np.ones(self.npores)
         return self.electron_transport.solve(
             { self.measured_voltage : self.gdl }, self.local_current )
 
     @property
     def protonic_potential(self):
         self.proton_transport.conductances = self.protonic_conductances
+        return 0*V * np.ones(self.npores)
         return self.proton_transport.solve(
             { 0*V : self.membrane }, -self.local_current )
 
@@ -189,6 +191,11 @@ class SimpleLatticedCatalystLayer(object):
     def oxygen_molar_fraction(self, k):
         self.gas_transport.conductances = self.diffusive_conductances
         return self.gas_transport.solve( { 0.21 : self.gdl }, k=k)
+
+    @property
+    def local_current_density(self):
+        valid = ~(self.gdl | self.membrane) # axes tails
+        return self.local_current / self.pore_agglomerate_area * valid
 
     @property
     def measured_current_density(self):
@@ -213,8 +220,7 @@ class SimpleLatticedCatalystLayer(object):
             T = self.temperature
             k = self.reaction_rate(T, n)
             x = self.oxygen_molar_fraction(k)
-            j = k*x * ( (A/m**2) / (mol/s) )
-            new_local_current = j * self.pore_agglomerate_area
+            new_local_current = k * x * F / 1000
             # insufficient convergence criterion
             steady_state = np.allclose(new_local_current.quantity, self.local_current.quantity)
             self.local_current = new_local_current
