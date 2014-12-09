@@ -11,25 +11,21 @@ class SimpleLatticedCatalystLayer(object):
     @classmethod
     def test(cls):
         # voltages = np.arange(0, 1.3, 0.1) * V
-        radii = 50*nm
+        radii = 5*nm
         porosity = 0.4
         thickness = 5*um
         cl = cls(thickness, radii, porosity, flat=True)
         cl.generate_agglomerate(200*cm**2/cm**2, 10*nm)
         return cl
 
-    def __init__(self, thickness, radii, porosity, N=200, flat=False):
+    def __init__(self, thickness, radii, porosity, N=1000, flat=False):
         '''
         given parameters, aim for a 10,000 pore model
         '''
         scale = 3 * radii
         nx = int( thickness / ( 3 * radii ) )
-        nz = ny = int(np.sqrt(N / nx))
-        if flat is True:
-            ny = N // nx
-            nz = 1
-        nx /= 2
-        ny *= 2
+        ny = max(1, N // nx)
+        nz = 1
         self.topology = mini.Cubic([nx, ny, nz], scale(m))
         logging.info("\nPore-phase topology generated"
                      "\n\t{0.order} pores, {0.size} throats"
@@ -188,9 +184,9 @@ class SimpleLatticedCatalystLayer(object):
     def temperature(self):
         return 333 * K
 
-    def oxygen_molar_fraction(self, k):
+    def oxygen_molar_fraction(self):
         self.gas_transport.conductances = self.diffusive_conductances
-        return self.gas_transport.solve( { 0.21 : self.gdl }, k=k)
+        return self.gas_transport.solve( { 0.21 : self.gdl }, k=self.k)
 
     @property
     def local_current_density(self):
@@ -218,8 +214,8 @@ class SimpleLatticedCatalystLayer(object):
         for _ in range(max_iter):
             n = self.overpotential
             T = self.temperature
-            k = self.reaction_rate(T, n)
-            x = self.oxygen_molar_fraction(k)
+            k = self.k = self.reaction_rate(T, n)
+            x = self.oxygen_molar_fraction()
             new_local_current = k * x * F / 1000
             # insufficient convergence criterion
             steady_state = np.allclose(new_local_current.quantity, self.local_current.quantity)
