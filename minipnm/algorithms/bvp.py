@@ -137,7 +137,7 @@ class System(object):
         the first n methods in the array. therefore, to maintain symmetry, a
         call only exposes the last m
         '''
-        return self._con[self.m:]
+        return self._con[-self.m:]
 
     @conductances.setter
     def conductances(self, values):

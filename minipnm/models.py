@@ -18,7 +18,7 @@ class SimpleLatticedCatalystLayer(object):
         cl.generate_agglomerate(200*cm**2/cm**2, 10*nm)
         return cl
 
-    def __init__(self, thickness, radii, porosity, N=1000, flat=False):
+    def __init__(self, thickness, radii, porosity, N=200, flat=False):
         '''
         given parameters, aim for a 10,000 pore model
         '''
@@ -26,6 +26,8 @@ class SimpleLatticedCatalystLayer(object):
         nx = int( thickness / ( 3 * radii ) )
         ny = max(1, N // nx)
         nz = 1
+        nx = 20
+        ny = 10
         self.topology = mini.Cubic([nx, ny, nz], scale(m))
         logging.info("\nPore-phase topology generated"
                      "\n\t{0.order} pores, {0.size} throats"
