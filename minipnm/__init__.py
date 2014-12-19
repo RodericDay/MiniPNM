@@ -17,4 +17,4 @@ from . import geometry
 from . import image
 from . import graphics
 from . import models
-from .gui import GUI
+from . import gui

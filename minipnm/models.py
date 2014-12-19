@@ -1,3 +1,4 @@
+from collections import OrderedDict, deque
 import numpy as np
 import minipnm as mini
 import MKS
@@ -5,21 +6,50 @@ MKS.define(globals())
 
 
 class ConvergenceError(Exception):
-    msg = "Failed to converge. Collected states." 
+    def __iter__(self):
+        '''
+        memory between instances is currently shared
+        '''
+        for entry in Model.memory:
+            yield entry
 
 
 class Model():
+    memory = deque(maxlen=4)
+
+    properties = [
+        'distance from membrane (um)',
+        'protonic potential (V)',
+        'electronic potential (V)',
+        'reaction rate (m/s)',
+        'oxygen molar fraction',
+        'current density distribution (A/cm**2)',
+    ]
+
+    def __getitem__(self, key):
+        # very sensitive to correct naming
+        if '(' in key:
+            name, units = key.rsplit(' ', 1)
+        else: # handle dimension-less
+            name, units = key, '1'
+        attribute = name.replace(' ', '_')
+        units = eval(units)
+        values = getattr(self, attribute) / units
+        return values
+
     # geometric stuff
     spacing = 150 * nm
     number_of_nodes = 100
-    area = np.pi * (20 * nm)**2
+    cross_sectional_area = np.pi * (15 * nm)**2
+    surface_area = 4. * np.pi * (20 * nm)**2
+    electrochemically_active_surface_area_ratio = 200
     # transport
-    protonic_conductance = 1E-6 * S
-    diffusive_conductance = 8E-12 * mol / s
+    protonic_conductivity = 0.1 * S / m
+    binary_diffusion_coefficient = 2.02E-5 * ( m**3 / s ) / m
     # environmental properties
-    pressure = 1 * atm
-    empirical_rate_constant = 3.44E-11 * m / s
-    temperature = 333 * K
+    pressure = 2.27 * atm
+    empirical_rate_constant = 3.44E-6 * 1 / s * spacing
+    temperature = 353 * K
     # initial conditions
     reaction_rate = 0 * m / s
     oxygen_molar_fraction = 0.21
@@ -45,9 +75,24 @@ class Model():
         return self.pressure / ( R * self.temperature )
 
     @property
+    def protonic_conductance(self):
+        s = self.protonic_conductivity
+        A = self.cross_sectional_area
+        l = self.spacing
+        return s * A / l
+
+    @property
+    def diffusive_conductance(self):
+        D = self.binary_diffusion_coefficient
+        c = self.gas_concentration
+        A = self.cross_sectional_area
+        l = self.spacing
+        return D * c * A / l
+
+    @property
     def protonic_potential(self):
         i = self.current_density_distribution
-        A = self.area
+        A = self.surface_area * self.electrochemically_active_surface_area_ratio
         return self.solid_phase.solve( { 0*V : self.membrane }, i*A)
 
     @property
@@ -67,12 +112,12 @@ class Model():
         n = self.overpotential
         T = self.temperature
         e = np.exp( - n * F / ( R * T ) ) #- np.exp( n * F / ( R * T ) )
-        self.reaction_rate = 0.5 * (k0 * e + self.reaction_rate)
+        self.reaction_rate = k0 * e
 
     def update_oxygen_fraction(self):
         k = self.reaction_rate
         C = self.gas_concentration
-        A = self.area
+        A = self.surface_area * self.electrochemically_active_surface_area_ratio
         x = self.gas_phase.solve( { 0.21 : self.gdl }, k=k*C*A )
         self.oxygen_molar_fraction = x
 
@@ -84,60 +129,46 @@ class Model():
 
     @property
     def current_density(self):
-        return self.current_density_distribution.sum()/10000
-
-    @property
-    def labels(self):
-        return [
-            'distance from membrane (um)',
-            'protonic potential (V)',
-            'electronic potential (V)',
-            'reaction rate (m/s)',
-            'oxygen molar fraction',
-            'current density distribution (A/cm**2)',
-        ]
+        return self.current_density_distribution.sum()
 
     def state(self):
-        '''
-        build a numpy recarray to contain all of our data
-        http://docs.scipy.org/doc/numpy/user/basics.rec.html
-
-        function as a very compact dict of arrays. obtain 'keys' via
-        >>> recarray.dtype.names
-        '''
-        # very sensitive to correct naming
-        dtype = [(l, float) for l in self.labels]
-        shape = (self.number_of_nodes,)
-        recarray = np.zeros(shape, dtype=dtype)
-        for label in self.labels:
-            if '(' in label:
-                name, units = label.rsplit(' ', 1)
-            else: # handle dimension-less
-                name, units = label, '1'
-            attribute = name.replace(' ', '_')
-            units = eval(units)
-            values = getattr(self, attribute) / units
-            recarray[label] = values
-        return recarray
+        state = OrderedDict()
+        for label in self.properties:
+            state[label] = np.ones(self.number_of_nodes) * self[label]
+        return state
 
     def steady_state(self):
         '''
-        verify whether we are at steady state by iterating and comparing
+        verify whether we are at steady state by iterating and comparing all
+        relevant data series
         '''
-        old_distribution = self.current_density_distribution.quantity
-        self.update_reaction_rate()
-        self.update_oxygen_fraction()
-        new_distribution = self.current_density_distribution.quantity
-        return np.allclose(old_distribution, new_distribution)
+        keys = ['current density distribution (A/cm**2)']
 
-    def converge(self, gdl_voltage, N=100):
-        self.gdl_voltage = gdl_voltage * V
-        for i in range(N):
-            if self.steady_state():
-                break
+        if len(self.memory) < 2:
+            raise ConvergenceError('Too few samples')
+        elif all(np.allclose(self.memory[0][k], self.memory[1][k]) for k in keys):
+            state = self.memory.popleft()
+            self.memory.clear()
+            return state
+        elif len(self.memory) == 4 and \
+            all(np.allclose(self.memory[0][k], self.memory[2][k]) for k in keys) and \
+            all(np.allclose(self.memory[1][k], self.memory[3][k]) for k in keys):
+            raise ConvergenceError('Oscillatory instability')
         else:
-            raise ConvergenceError()
-        return self.state()
+            raise ConvergenceError('No stability found')
+
+    def converge(self, gdl_voltage, N=30):
+        self.gdl_voltage = gdl_voltage * V
+        self.memory.clear()
+        for i in range(N):
+            self.update_reaction_rate()
+            self.update_oxygen_fraction()
+            self.memory.appendleft( self.state() )
+            try:
+                return self.steady_state()
+            except ConvergenceError as error:
+                continue
+        raise error
 
     def polarization_curve(self, span=(0, 1), samples=20, N=30):
         error = None
@@ -147,89 +178,21 @@ class Model():
 
         for gdl_voltage in np.linspace(vmax, vmin, samples):
             try:
-                self.converge(gdl_voltage, N)
+                state = self.converge(gdl_voltage, N)
+                voltages.append( gdl_voltage )
+                currents.append( state['current density distribution (A/cm**2)'].sum() )
             except ConvergenceError as error:
-                currents.append( self.current_density(A/cm**2) )
-                voltages.append( gdl_voltage )
-                self.steady_state()
-            finally:
-                currents.append( self.current_density(A/cm**2) )
-                voltages.append( gdl_voltage )
+                # print error, 'for', gdl_voltage
+                for state in error:
+                    voltages.append( gdl_voltage )
+                    currents.append( state['current density distribution (A/cm**2)'].sum() )
 
-        if error is None:
-            return currents, voltages
+        if error is not None:
+            return currents, voltages, 'x'
         else:
-            error.points = [currents, voltages]
-            # raise error
             return currents, voltages
 
 
 if __name__ == '__main__':
-    import matplotlib.pyplot as plt
-    plt.rc('font', size=8)
-
-    class GangedPlot(dict):
-        fig = plt.figure()
-        fig.subplots_adjust(hspace=0.001)
-        fig.canvas.mpl_connect('key_press_event',
-            lambda event: exit() if event.key=='q' else None)
-
-        def __init__(self, label_list):
-            # profile plots
-            n = len(label_list)-1
-            for i, ylabel in enumerate(label_list[1:], 1):
-                ax = self[ylabel] = self.fig.add_subplot(n, 2, 2*i-1)
-                plt.setp( ax.get_xticklabels(), visible=False )
-                ax.set_ylabel(ylabel, rotation=0)
-                ax.yaxis.set_label_coords(0.5, 0.76)
-                ax.set_yticks([])
-            ax.set_xlabel(label_list[0])
-            plt.setp( ax.get_xticklabels(), visible=True )
-
-            self.pax = self.fig.add_subplot(1, 2, 2)
-            self.pax.yaxis.tick_right()
-            self.pax.yaxis.set_label_position("right")
-            self.pax.set_xlabel('geometric current density (A/cm**2)')
-            self.pax.set_ylabel('voltage at gdl (V)')
-            self.fig.canvas.mpl_connect('button_press_event',
-                lambda event: self.click(event) if self.pax is event.inaxes else None)
-            self.fig.canvas.mpl_connect('motion_notify_event',
-                lambda event: self.click(event) if self.pax is event.inaxes and event.button is 1 else None)
-            # polarization curve
-
-        def update(self, recarray):
-            labels = recarray.dtype.names
-            xlabel = labels[0]
-            x = recarray[xlabel]
-            for ylabel in labels[1:]:
-                data = recarray[ylabel]
-                ax = self[ylabel]
-                ax.set_xlim(x.min(), x.max())
-                if ax.lines:
-                    line = ax.lines[0]
-                    line.set_data(x, data)
-                else:
-                    ax.plot(x, data)
-
-                # fix yticks
-                yminold, ymaxold = ax.get_ylim()
-                if data.ptp():
-                    ymin, ymax = data.min(), data.max()
-                else:
-                    ymean = data.mean()
-                    ymin, ymax = ymean-0.5, ymean+0.5
-                ax.set_ylim(min(yminold, ymin), max(ymaxold, ymax))
-                yticks = np.linspace(ymin, ymax, 7)[1:-1]
-                ax.set_yticks(yticks)
-            self.fig.canvas.draw()
-
-        def click(self, event):
-            voltage = event.ydata
-            self.update(model.converge(voltage))
-
     model = Model()
-    plot = GangedPlot(model.labels)
-
-    x,y = model.polarization_curve()
-    plot.pax.plot(x, y, 'x--')
-    plt.show()
+    mini.gui.GangedPlot(model)
