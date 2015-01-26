@@ -6,4 +6,4 @@ except ImportError:
     QtGui = type("vtk, PyQt, or pyqtgraph missing. functionality unavailable!",
                  (), {"QWidget": object, "QMainWindow": object})
 
-from ganged_plot import GangedPlot
+from .ganged_plot import GangedPlot

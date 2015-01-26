@@ -2,6 +2,10 @@ import numpy as np
 import minipnm as mini
 
 def test_scene(N=10):
+    try:
+        import vtk
+    except ImportError:
+        return
     scene = mini.Scene()
     network = mini.Cubic([10,10])
     # draw a simple wired cubic going from red to white to blue

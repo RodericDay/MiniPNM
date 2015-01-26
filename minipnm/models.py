@@ -48,7 +48,7 @@ class Model():
     binary_diffusion_coefficient = 2.02E-5 * ( m**3 / s ) / m
     # environmental properties
     pressure = 2.27 * atm
-    empirical_rate_constant = 3.44E-6 * 1 / s * spacing
+    empirical_rate_constant = 3.44E-6 / s * spacing
     temperature = 353 * K
     # initial conditions
     reaction_rate = 0 * m / s

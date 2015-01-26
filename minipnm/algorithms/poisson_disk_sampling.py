@@ -102,4 +102,4 @@ def poisson_disk_sampling(r=1, bbox=[10,10], attempts=30, limit=10000):
             available.remove(i)
 
     x,y,z,r = zip(*disk_list)
-    return zip(x,y,z), r
+    return list(zip(x,y,z)), r

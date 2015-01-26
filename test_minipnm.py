@@ -8,15 +8,6 @@ import numpy as np
 
 import minipnm as mini
 
-def disabled_test_save_load_of_vtp_file():
-    network = mini.Cubic(np.ones([3,3,3]))
-    mini.save_vtp(network, 'test.vtp')
-    for key, loaded_array in mini.load_vtp('test.vtp').items():
-        original_array = network.pop(key)
-        assert (original_array - loaded_array<1E6).all()
-    assert( len(network) == 0 )
-    os.system("find . -name 'test.vtp' -delete")
-
 def test_print():
     network = mini.Delaunay.random(100)
     print( network )
@@ -71,20 +62,22 @@ def test_qhull_coplanar():
     network.boundary()
 
 def test_lengths():
-    # create a voxelized sphere. black (1s) is void.
+    # create a voxelized sphere. black (ones, vs. zeros) is void.
     N = 13
     im = np.ones([N,N,N])
     for i in [i for i, c in np.ndenumerate(im) if np.linalg.norm(np.subtract(i, N/2-0.5))>N/2.5]:
         im[i] = 0
 
-def test_save_and_load():
-    original = mini.Cubic([20,20,20])
-    mini.save(original)
-    copy = mini.load('Cubic.npz')
-    assert type(original) is type(copy)
-    for key, value in original.items():
-        np.testing.assert_allclose(copy[key], value)
-    os.system("rm Cubic.npz")
+def disable_test_save_and_load():
+    try:
+        original = mini.Cubic([20,20,20])
+        mini.save(original)
+        copy = mini.load('Cubic.npz')
+        assert type(original) is type(copy)
+        for key, value in original.items():
+            np.testing.assert_allclose(copy[key], value)
+    finally:
+        os.system("rm Cubic.npz")
 
 def test_clone():
     original = mini.Cubic([5,5,5])

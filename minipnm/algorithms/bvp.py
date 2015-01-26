@@ -84,7 +84,7 @@ class System(object):
 
         # insert linear terms where applicable
         if k is not None:
-            fixed = np.sum(dbcs.values(), axis=0)
+            fixed = np.sum(list(dbcs.values()), axis=0)
             k /= (self.fu / self.pu)
             A.data[self.reindex[:self.n]] -= np.where(fixed, 0, k)
 

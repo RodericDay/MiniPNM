@@ -2,20 +2,6 @@ import itertools as it
 import numpy as np
 import minipnm as mini
 
-def test_linear_solver():
-    R = mini.image.gaussian_noise([10, 10, 10])
-    network = mini.Cubic.from_source(R)
-    network = network - (R<np.percentile(R, 10))
-    x,y,z = network.coords
-    l = x == x.min()
-    r = x == x.max()
-    dbcs = { 2 : l, 1 : r }
-    sol = mini.algorithms.bvp.solve(network.system(), dbcs)
-
-    l_flux = np.subtract(*network.cut(l, sol)).sum()
-    r_flux = -np.subtract(*network.cut(r, sol)).sum()
-    np.testing.assert_allclose(l_flux, r_flux, rtol=1E-3)
-
 def disable_test_invasion():
     network = mini.Cubic([20,20])
     x,y,z = network.coords
