@@ -59,7 +59,10 @@ class Model():
             assert hasattr(self, key)
             setattr(self, key, value)
         n = self.number_of_nodes
-        cubic = mini.Cubic([n,1,1], bbox=[n*self.spacing(m),1,1])
+        l = n * self.spacing / m
+        w = self.spacing / m
+        h = self.spacing / m
+        cubic = mini.Cubic([n,1,1], bbox=[l,h,w])
         x,y,z = cubic.coords
         self.gdl = x==x.max()
         self.membrane = x==x.min()

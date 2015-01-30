@@ -98,6 +98,6 @@ class System(object):
         k = any linearly dependent terms ie: kx
         '''
         A, b = self.system(dbcs, k)
-        fixed = np.sum(dbcs.values(), axis=0)
+        fixed = np.sum(list(dbcs.values()), axis=0)
         b = np.where(fixed, b, 0 if s is None else s / self.fu)
         return spsolve(A, b) * self.pu
