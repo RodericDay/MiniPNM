@@ -2,10 +2,34 @@ import itertools as it
 import numpy as np
 import minipnm as mini
 
-def disable_test_invasion():
-    network = mini.Cubic([20,20])
-    x,y,z = network.coords
-    sol = mini.algorithms.invasion(network.adjacency_matrix, x==x.min(), x==x.max())
+def test_bvp(flux_units=1, potential_units=1,
+    diagonal_terms=0, rhs_terms=0):
+    # units
+    conductance_units = flux_units / potential_units
+    # domain
+    cubic = mini.Cubic([10, 1, 1])
+    x, y, z = cubic.coords
+    # init
+    system = mini.bvp.System(cubic.pairs,
+        flux_units=flux_units,
+        potential_units=potential_units)
+    system.conductances = 1 * conductance_units
+    # solve
+    expected = np.linspace(2, 5, 10)
+    solution = system.solve(
+        {
+            2 * potential_units : x==x.min(),
+            5 * potential_units : x==x.max(),
+        })
+    solution /= potential_units
+    assert np.allclose(solution, expected)
+
+try:
+    import MKS
+    MKS.define(globals())
+    test_bvp_with_units = lambda: test_bvp(flux_units=A, potential_units=V)
+except ImportError:
+    pass
 
 def test_shortest_path():
     string = '''

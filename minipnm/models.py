@@ -21,7 +21,7 @@ class Model():
         'distance from membrane (um)',
         'protonic potential (V)',
         'electronic potential (V)',
-        'reaction rate (m/s)',
+        'reaction rate constant (m/s)',
         'oxygen molar fraction',
         'current density distribution (A/cm**2)',
     ]
@@ -51,7 +51,7 @@ class Model():
     empirical_rate_constant = 3.44E-6 / s * spacing
     temperature = 353 * K
     # initial conditions
-    reaction_rate = 0 * m / s
+    reaction_rate_constant = 0 * m / s
     oxygen_molar_fraction = 0.21
 
     def __init__(self, **kwargs):
@@ -65,9 +65,9 @@ class Model():
         self.membrane = x==x.min()
         self.distance_from_membrane = x * m
 
-        self.solid_phase = mini.bvp.System(cubic.pairs, flux=A, potential=V)
+        self.solid_phase = mini.bvp.System(cubic.pairs, flux_units=A, potential_units=V)
         self.solid_phase.conductances = self.protonic_conductance
-        self.gas_phase = mini.bvp.System(cubic.pairs, flux=mol/s, potential=1)
+        self.gas_phase = mini.bvp.System(cubic.pairs, flux_units=mol/s, potential_units=1)
         self.gas_phase.conductances = self.diffusive_conductance
 
     @property
@@ -93,7 +93,7 @@ class Model():
     def protonic_potential(self):
         i = self.current_density_distribution
         A = self.surface_area * self.electrochemically_active_surface_area_ratio
-        return self.solid_phase.solve( { 0*V : self.membrane }, i*A)
+        return self.solid_phase.solve( { 0*V : self.membrane }, s = 2E-14 * (i*A).units )
 
     @property
     def electronic_potential(self):
@@ -111,11 +111,11 @@ class Model():
         k0 = self.empirical_rate_constant
         n = self.overpotential
         T = self.temperature
-        e = np.exp( - n * F / ( R * T ) ) #- np.exp( n * F / ( R * T ) )
-        self.reaction_rate = k0 * e
+        e = np.exp( - n * F / ( R * T ) ) - np.exp( n * F / ( R * T ) )
+        self.reaction_rate_constant = k0 * e
 
     def update_oxygen_fraction(self):
-        k = self.reaction_rate
+        k = self.reaction_rate_constant
         C = self.gas_concentration
         A = self.surface_area * self.electrochemically_active_surface_area_ratio
         x = self.gas_phase.solve( { 0.21 : self.gdl }, k=k*C*A )
@@ -123,7 +123,7 @@ class Model():
 
     @property
     def current_density_distribution(self):
-        k = self.reaction_rate
+        k = self.reaction_rate_constant
         c = self.oxygen_concentration
         return k * c * F * ~(self.gdl | self.membrane)
 

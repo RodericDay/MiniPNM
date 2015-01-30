@@ -10,10 +10,10 @@ class System(object):
     application of boundary conditions without rebuilding the entire matrix
     every time, for fast iterations over changing environmental conditions
     '''
-    def __init__(self, pairs, flux=1, potential=1, conductances=None):
+    def __init__(self, pairs, flux_units=1, potential_units=1, conductances=None):
         # this may be handled better in the future, but these are unit defs
-        self.fu = flux
-        self.pu = potential
+        self.fu = flux_units
+        self.pu = potential_units
 
         # create nodes / diags
         self.n = n = np.max(pairs) + 1 # we need a better heuristic for stragglers
@@ -61,6 +61,7 @@ class System(object):
     def conductances(self, values):
         # unit check
         values = values * (self.pu / self.fu)
+        assert not hasattr(values, 'units')
 
         # create a skeleton and populate the conductance part
         self._con = np.hstack([np.zeros(self.n), np.ones(self.m)*values])
