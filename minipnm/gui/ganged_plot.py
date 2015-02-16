@@ -3,13 +3,19 @@ import matplotlib.pyplot as plt
 plt.rc('font', size=8)
 
 class GangedPlot(dict):
-    fig = plt.figure()
-    fig.subplots_adjust(hspace=0.001)
-    fig.canvas.mpl_connect('key_press_event',
-        lambda event: exit() if event.key=='q' else None)
-
+    '''
+    fundamentally a dictionary, whose entries are the
+    corresponding profile plot axes
+    '''
     def __init__(self, model):
+        # link data
         self.model = model
+
+        # matpotlib init
+        self.fig = plt.figure()
+        self.fig.subplots_adjust(hspace=0.001)
+        self.fig.canvas.mpl_connect('key_press_event',
+            lambda event: exit() if event.key=='q' else None)
 
         # profile plots
         n = len(model.properties)-1
@@ -40,9 +46,14 @@ class GangedPlot(dict):
             print( 'autoscaled {}'.format(ax) )
 
     def update(self, state, c='k'):
-        x = state['distance from membrane (um)']
+        '''
+        state must be a dictionary object containing relevant data
+        '''
+        first_key = next(iter(state))
+        x = state[first_key]
         for ylabel, ax in self.items():
             data = state[ylabel]
+            ax.lines = [] # clears plot, let gc delete objects
             ax.set_xlim(x.min(), x.max())
             ax.plot(x, data, c)
 
@@ -53,7 +64,7 @@ class GangedPlot(dict):
                 ymin, ymax = ymean-0.5, ymean+0.5
 
             # yminold, ymaxold = ax.get_ylim()
-            # ymin = min(yminold, ymin) 
+            # ymin = min(yminold, ymin)
             # ymax = max(ymaxold, ymax)
 
             ax.set_ylim(ymin, ymax)
@@ -63,18 +74,25 @@ class GangedPlot(dict):
             ax.set_yticks(yticks)
 
     def click(self, event):
-        voltage = event.ydata
-        for ax in self.values():
-            ax.lines = []
-        try:
-            self.update(self.model.converge(voltage))
-        except Exception as error:
-            for state in error:
-                self.update(state, 'r')
+        variable = event.ydata
+        state = self.model.resolve(variable)
+        self.update(state)
         self.fig.canvas.draw()
+
+        # for ax in self.values():
+        #     ax.lines = []
+        # try:
+        # except Exception as error:
+        #     # plot all error states
+        #     try:
+        #         for state in error:
+        #             self.update(state, 'r')
+        #     except TypeError:
+        #         raise error
 
 if __name__ == '__main__':
     import minipnm as mini
 
     model = mini.models.Model()
+    model.protonic_conductivity *= 1E-5
     plot = GangedPlot(model)

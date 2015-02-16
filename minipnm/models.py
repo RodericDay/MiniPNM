@@ -5,26 +5,19 @@ import MKS
 MKS.define(globals())
 
 
-class ConvergenceError(Exception):
-    def __iter__(self):
-        '''
-        memory between instances is currently shared
-        '''
-        for entry in Model.memory:
-            yield entry
+class ConvergenceError(RuntimeError):
+    pass # this guy should offer some easily examinable insight
+    # into what went wrong
 
+class OscillationError(ConvergenceError):
+    pass
 
-class Model():
+class AbstractModel():
+    # save last four states in a deque to check for oscillations
     memory = deque(maxlen=4)
 
-    properties = [
-        'distance from membrane (um)',
-        'protonic potential (V)',
-        'electronic potential (V)',
-        'reaction rate constant (m/s)',
-        'oxygen molar fraction',
-        'current density distribution (A/cm**2)',
-    ]
+    def __init__(self):
+        raise NotImplementedError()
 
     def __getitem__(self, key):
         # very sensitive to correct naming
@@ -37,12 +30,32 @@ class Model():
         values = getattr(self, attribute) / units
         return values
 
+    @property
+    def state(self):
+        state = OrderedDict()
+        for label in self.properties:
+            state[label] = self[label]
+        return state
+
+
+class Model(AbstractModel):
+
+    # first property assumed to be x-axis in profiles
+    properties = [
+        'distance from membrane (um)',
+        'protonic potential (V)',
+        # 'electronic potential (V)',
+        # 'reaction rate constant (m/s)',
+        'oxygen molar fraction',
+        'current density distribution (A/cm**2)',
+    ]
+
     # geometric stuff
     spacing = 150 * nm
     number_of_nodes = 100
     cross_sectional_area = np.pi * (15 * nm)**2
     surface_area = 4. * np.pi * (20 * nm)**2
-    electrochemically_active_surface_area_ratio = 200
+    electrochemically_active_surface_area_ratio = 20
     # transport
     protonic_conductivity = 0.1 * S / m
     binary_diffusion_coefficient = 2.02E-5 * ( m**3 / s ) / m
@@ -55,9 +68,12 @@ class Model():
     oxygen_molar_fraction = 0.21
 
     def __init__(self, **kwargs):
+        # only allow changing variables if they have been defined
         for key, value in kwargs.items():
             assert hasattr(self, key)
             setattr(self, key, value)
+
+        # create geometry
         n = self.number_of_nodes
         l = n * self.spacing / m
         w = self.spacing / m
@@ -68,6 +84,7 @@ class Model():
         self.membrane = x==x.min()
         self.distance_from_membrane = x * m
 
+        # create transport mechanisms
         self.solid_phase = mini.bvp.System(cubic.pairs, flux_units=A, potential_units=V)
         self.solid_phase.conductances = self.protonic_conductance
         self.gas_phase = mini.bvp.System(cubic.pairs, flux_units=mol/s, potential_units=1)
@@ -96,7 +113,8 @@ class Model():
     def protonic_potential(self):
         i = self.current_density_distribution
         A = self.surface_area * self.electrochemically_active_surface_area_ratio
-        return self.solid_phase.solve( { 0*V : self.membrane }, s = 2E-14 * (i*A).units )
+        return self.solid_phase.solve( { 0*V : self.membrane }, s=2E-14 * (i*A).units )
+        # return self.solid_phase.solve( { 0*V : self.membrane }, s=i*A )
 
     @property
     def electronic_potential(self):
@@ -104,7 +122,7 @@ class Model():
 
     @property
     def overpotential(self):
-        return self.electronic_potential - self.protonic_potential - 1.22*V
+        return self.electronic_potential - self.protonic_potential - 1.223*V
 
     @property
     def oxygen_concentration(self):
@@ -114,7 +132,9 @@ class Model():
         k0 = self.empirical_rate_constant
         n = self.overpotential
         T = self.temperature
-        e = np.exp( - n * F / ( R * T ) ) - np.exp( n * F / ( R * T ) )
+        z = 4
+        a = 0.5
+        e = np.exp( - a*z*F*n / ( R*T ) ) - np.exp( (1-a)*z*F*n / ( R*T ) )
         self.reaction_rate_constant = k0 * e
 
     def update_oxygen_fraction(self):
@@ -134,44 +154,42 @@ class Model():
     def current_density(self):
         return self.current_density_distribution.sum()
 
-    def state(self):
-        state = OrderedDict()
-        for label in self.properties:
-            state[label] = np.ones(self.number_of_nodes) * self[label]
-        return state
-
+    @property
     def steady_state(self):
         '''
         verify whether we are at steady state by iterating and comparing all
-        relevant data series
+        relevant data series in memory
+
+        there are three possible outcomes
+        - convergence
+        - no solution
+        - oscillation
         '''
         keys = ['current density distribution (A/cm**2)']
 
         if len(self.memory) < 2:
-            raise ConvergenceError('Too few samples')
+            return False
+
         elif all(np.allclose(self.memory[0][k], self.memory[1][k]) for k in keys):
             state = self.memory.popleft()
             self.memory.clear()
-            return state
+            return True
+
         elif len(self.memory) == 4 and \
             all(np.allclose(self.memory[0][k], self.memory[2][k]) for k in keys) and \
             all(np.allclose(self.memory[1][k], self.memory[3][k]) for k in keys):
-            raise ConvergenceError('Oscillatory instability')
-        else:
-            raise ConvergenceError('No stability found')
+            raise OscillationError()
 
-    def converge(self, gdl_voltage, N=30):
+    def resolve(self, gdl_voltage, N=30):
         self.gdl_voltage = gdl_voltage * V
         self.memory.clear()
-        for i in range(N):
+        for self.state_resolution_iteration_number in range(N):
             self.update_reaction_rate()
             self.update_oxygen_fraction()
-            self.memory.appendleft( self.state() )
-            try:
-                return self.steady_state()
-            except ConvergenceError as error:
-                continue
-        raise error
+            self.memory.appendleft( self.state )
+            if self.steady_state:
+                return self.state
+        raise ConvergenceError("No stability found")
 
     def polarization_curve(self, span=(0, 1), samples=20, N=30):
         error = None
@@ -181,21 +199,14 @@ class Model():
 
         for gdl_voltage in np.linspace(vmax, vmin, samples):
             try:
-                state = self.converge(gdl_voltage, N)
+                state = self.resolve(gdl_voltage, N)
                 voltages.append( gdl_voltage )
-                currents.append( state['current density distribution (A/cm**2)'].sum() )
-            except ConvergenceError as error:
-                # print error, 'for', gdl_voltage
-                for state in error:
+                current_output = state['current density distribution (A/cm**2)']
+                currents.append( current_output.sum() )
+            except ConvergenceError:
+                for state in self.memory:
                     voltages.append( gdl_voltage )
-                    currents.append( state['current density distribution (A/cm**2)'].sum() )
+                    current_output = state['current density distribution (A/cm**2)']
+                    currents.append( current_output.sum() )
 
-        if error is not None:
-            return currents, voltages, 'x'
-        else:
-            return currents, voltages
-
-
-if __name__ == '__main__':
-    model = Model()
-    mini.gui.GangedPlot(model)
+        return currents, voltages
