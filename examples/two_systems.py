@@ -1,13 +1,10 @@
 import numpy as np
 import minipnm as mini
 
-cubic = mini.Cubic([20,1,20], scaling=8E-6)
-x,y,z = cubic.coords
-
-F = 96487
-R = 8.314
-
 class Model(object):
+    global F, R
+    F = 96487
+    R = 8.314
 
     properties = [
         'protonic_potential',
@@ -15,18 +12,19 @@ class Model(object):
         'local_current',
     ]
 
+    cubic = mini.Cubic([30,1,30], scaling=8E-6)
+    x,y,z = cubic.coords
+
     distance_from_membrane = z
     open_current_voltage = 1.223 # V
     oxygen_ratio = 4
     ecsa_ratio = 20
     surface_area = 1.936E-9
 
-    noise = np.random.rand(cubic.size) * 0
-    blocked_pores = np.random.rand(cubic.order) < 0.1
-    open_throats = ~cubic.cut(blocked_pores, directed=False)
+    noise = np.random.rand(cubic.size)
 
     oxygen_transport = mini.bvp.System(cubic.pairs)
-    oxygen_transport.conductances = 3.769E-8 * (1+noise) * open_throats
+    oxygen_transport.conductances = 3.769E-8 * (1+noise)
 
     proton_transport = mini.bvp.System(cubic.pairs)
     proton_transport.conductances = 0.00235592 * (1+noise)
@@ -45,11 +43,13 @@ class Model(object):
         return k_cat/(z*F)
 
     def update_oxygen(self):
+        z = self.distance_from_membrane
         dbcs = { 0.01 : z==z.max() }
         k = self.reaction_rate_constant
         self._x = self.oxygen_transport.solve(dbcs, k=k)
 
     def update_overpotential(self):
+        z = self.distance_from_membrane
         dbcs = { 0 : z==z.min() }
         s = self.local_current
         self._h = self.proton_transport.solve(dbcs, s=s)
@@ -87,20 +87,17 @@ class Model(object):
         k = self.reaction_rate_constant
         x = self.oxygen_mole_fraction
         r = self.oxygen_ratio
-        return k*x*r*F * ~(z==z.max())
+        return k*x*r*F
 
     def resolve(self, cell_voltage, overpotential=-0.02):
         self.overpotential = overpotential
         self.cell_voltage = cell_voltage
         for outer_loop_count in range(0,500):
-            if outer_loop_count%10==0: print '.',
             self.update_oxygen()
             self.update_overpotential()
             if self.check_convergence():
-                print
                 return
-        print
-        # raise RuntimeError("No convergence")
+        raise RuntimeError("No convergence")
 
     def polarization_curve(self, voltage_range=[0.5]):
         V = []
@@ -111,28 +108,34 @@ class Model(object):
             I.append( self.local_current.sum() / self.surface_area )
         return I, V
 
-import matplotlib.pyplot as plt
-from matplotlib.widgets import Slider
+    def block(self, blocked_pores):
+        open_throats = ~self.cubic.cut(blocked_pores, directed=False)
+        self.oxygen_transport.conductances *= open_throats
 
-model = Model()
-fig, ax = plt.subplots(len(model.properties)+1)
+if __name__ == '__main__':
+    import matplotlib.pyplot as plt
+    from matplotlib.widgets import Slider
 
-X, Y = model.polarization_curve(np.linspace(0.4,0.9,5))
-fig.subplots_adjust(right=0.5)
-pax = fig.add_axes([0.6, 0.1, 0.3, 0.8])
-pax.plot(X, Y)
+    model = Model()
+    model.block( np.random.rand(model.cubic.order) < 0.2 )
+    fig, ax = plt.subplots(len(model.properties)+1)
 
-def update(V_cell):
-    model.resolve(V_cell)
-    x = model.distance_from_membrane
-    for i, attribute in enumerate(model.properties):
-        y = getattr(model, attribute)
-        # ax[i].matshow(cubic.asarray(y))
-        ax[i].clear()
-        ax[i].plot(x, y, 'bgrcmk'[i]+'x')
-    fig.canvas.draw()
-sld = Slider(ax[-1], 'V_cell', 0.1, 1.1, 0.9)
-sld.on_changed(update)
-update(0.9)
+    X, Y = model.polarization_curve(np.linspace(0.4,0.9,5))
+    fig.subplots_adjust(right=0.5)
+    pax = fig.add_axes([0.6, 0.1, 0.3, 0.8])
+    pax.plot(X, Y)
 
-plt.show(); exit()
+    def update(V_cell):
+        model.resolve(V_cell)
+        x = model.distance_from_membrane
+        for i, attribute in enumerate(model.properties):
+            y = getattr(model, attribute)
+            ax[i].matshow(model.cubic.asarray(y))
+            # ax[i].clear()
+            # ax[i].plot(x, y, 'bgrcmk'[i]+'x')
+        fig.canvas.draw()
+    sld = Slider(ax[-1], 'V_cell', 0.1, 1.1, 0.9)
+    sld.on_changed(update)
+    update(0.9)
+
+    plt.show(); exit()

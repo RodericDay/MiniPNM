@@ -15,9 +15,9 @@ tt = time.time()-t0
 
 network = mini.Radial(centers, radii)
 x,y,z = network.coords
-gui = mini.GUI()
-network.render(scene=gui.scene)
-gui.run()
+# gui = mini.GUI()
+# network.render(scene=gui.scene)
+# gui.run()
 
 plt.hist(arr, bins=50, alpha=0.5, normed=True)
 plt.hist(network['sphere_radii'], bins=50, alpha=0.5, normed=True)

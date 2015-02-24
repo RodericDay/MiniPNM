@@ -14,8 +14,7 @@ class GangedPlot(dict):
         # matpotlib init
         self.fig = plt.figure()
         self.fig.subplots_adjust(hspace=0.001)
-        self.fig.canvas.mpl_connect('key_press_event',
-            lambda event: exit() if event.key=='q' else None)
+
 
         # profile plots
         n = len(model.properties)-1
