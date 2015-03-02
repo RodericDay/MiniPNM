@@ -29,7 +29,7 @@ class Network(dict):
     recover it later, it should suffice to call `network.items()` and write
     the output to a file.
 
-    Lastly, for the sake of communicability, there is a reference of choice for 
+    Lastly, for the sake of communicability, there is a reference of choice for
     terminology:
     http://en.wikipedia.org/wiki/Glossary_of_graph_theory
     '''
@@ -306,7 +306,7 @@ class Cubic(Network):
         network = cls(im.shape)
         network['source'] = im.ravel()
         return network
-    
+
     def __init__(self, shape, scaling=None, bbox=None):
         arr = np.atleast_3d(np.empty(shape))
 
@@ -334,7 +334,7 @@ class Cubic(Network):
             heads.extend(T.flat)
         self.pairs = np.vstack([tails, heads]).T
 
-    def asarray(self, values):
+    def asarray(self, values=None):
         spacing = map(np.diff, map(np.unique, self.coords))
         min_spacing = [min(a) if len(a) else 1.0 for a in spacing]
         points = (self.points / min_spacing).astype(int)
@@ -342,7 +342,8 @@ class Cubic(Network):
         bbox = (self.bbox / min_spacing + 1).astype(int)
         actual_indexes = np.ravel_multi_index(points.T, bbox)
         array = np.zeros(bbox)
-        array.flat[actual_indexes] = values.ravel()
+        if values is not None:
+            array.flat[actual_indexes] = values.ravel()
         return array.squeeze()
 
 

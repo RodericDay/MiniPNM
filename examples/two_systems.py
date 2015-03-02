@@ -12,22 +12,28 @@ class Model(object):
         'local_current',
     ]
 
-    cubic = mini.Cubic([30,1,30], scaling=8E-6)
-    x,y,z = cubic.coords
+    def __init__(self, shape=[30,30,1], radii=None):
+        self.cubic = mini.Cubic(shape, scaling=8E-6)
+        x,y,z = self.cubic.coords
 
-    distance_from_membrane = z
-    open_current_voltage = 1.223 # V
-    oxygen_ratio = 4
-    ecsa_ratio = 20
-    surface_area = 1.936E-9
+        self.ecsa_ratio = 20
+        self.surface_area = 1.936E-9
+        self.oxygen_ratio = 4
+        self.distance_from_membrane = x
+        self.open_current_voltage = 1.223 # V
 
-    noise = np.random.rand(cubic.size)
+        if radii is None:
+            noise = np.random.rand(self.cubic.size)
+        else:
+            radii = radii - radii.min()
+            radii = radii / radii.max()
+            noise = radii
 
-    oxygen_transport = mini.bvp.System(cubic.pairs)
-    oxygen_transport.conductances = 3.769E-8 * (1+noise)
+        self.oxygen_transport = mini.bvp.System(self.cubic.pairs)
+        self.oxygen_transport.conductances = 3.769E-8 * noise
 
-    proton_transport = mini.bvp.System(cubic.pairs)
-    proton_transport.conductances = 0.00235592 * (1+noise)
+        self.proton_transport = mini.bvp.System(self.cubic.pairs)
+        self.proton_transport.conductances = 0.00235592 * (1-noise)
 
     @property
     def reaction_rate_constant(self):
@@ -112,25 +118,27 @@ class Model(object):
         open_throats = ~self.cubic.cut(blocked_pores, directed=False)
         self.oxygen_transport.conductances *= open_throats
 
+
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
     from matplotlib.widgets import Slider
 
     model = Model()
+    x = model.distance_from_membrane
     model.block( np.random.rand(model.cubic.order) < 0.2 )
+    model.block( x < x.mean()/2 )
     fig, ax = plt.subplots(len(model.properties)+1)
 
-    X, Y = model.polarization_curve(np.linspace(0.4,0.9,5))
+    X, Y = model.polarization_curve(np.linspace(0.6,1.1,5))
     fig.subplots_adjust(right=0.5)
     pax = fig.add_axes([0.6, 0.1, 0.3, 0.8])
     pax.plot(X, Y)
 
     def update(V_cell):
         model.resolve(V_cell)
-        x = model.distance_from_membrane
         for i, attribute in enumerate(model.properties):
             y = getattr(model, attribute)
-            ax[i].matshow(model.cubic.asarray(y))
+            ax[i].matshow(model.cubic.asarray(y).T)
             # ax[i].clear()
             # ax[i].plot(x, y, 'bgrcmk'[i]+'x')
         fig.canvas.draw()
