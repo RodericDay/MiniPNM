@@ -90,7 +90,7 @@ class Simulation(object):
         the state history
         '''
         bins = np.array(sorted(self.block_history.keys()))
-        return np.array([self.block_history[step] for step in 
+        return np.array([self.block_history[step] for step in
                 bins[np.digitize(range(len(self.history)), bins)-1]])
 
     def valid_edges(self):
@@ -212,7 +212,9 @@ class Invasion(Simulation):
     @staticmethod
     def pool(excess, labels):
         '''
-        consider that a single pore infused with the volumetric capacity of
+        The pool method "lumps" scalars based on provided labeling.
+
+        Consider that a single pore infused with the volumetric capacity of
         the entire network will sucessively spillover until it fills the whole
         thing. This behaviour cannot be improved upon.
 
@@ -222,24 +224,23 @@ class Invasion(Simulation):
         every cluster. The spillover of a cluster is the sum of every spillover
         of its individual pores.
 
-        The pool method "lumps" scalars based on provided labeling. Numpy 2.0
-        will introduce a `find` function for arrays, which should improve upon
-        the slow python list loop.
-
         >>> Invasion.pool([0.1, 0.1, 0.1, 0.1, 0.1], [0, 0, 0, 1, 1])
         array([ 0.3,  0. ,  0. ,  0.2,  0. ])
         '''
         vals = np.array(excess)
         idxs = np.arange(vals.size)
         mask = np.array(labels)
-        ijv = (vals, (idxs, mask))
 
+        # pooling step
+        ijv = (vals, (idxs, mask))
         binned = sparse.coo_matrix(ijv).sum(axis=0).A1
-        lst = mask.tolist()
-        vals *= 0
-        for i,v in enumerate(binned):
-            vals[lst.index(i)] = v
-        return vals
+
+        # now assign each pool to the first available
+        # representative of each pool
+        pool = np.zeros_like(vals)
+        _, mapping = np.unique(mask, return_index=True)
+        pool[mapping] += binned
+        return pool
 
     def find_unsaturated_neighbor(self, node):
         viable_throats = self.find_frontier_throats(node)
