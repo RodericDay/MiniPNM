@@ -27,19 +27,21 @@ def floodview(water_history, state_history, topology=None):
     # draw water on top
     water_layer = ax1.imshow(water_history[0],
         vmin=0.5, vmax=0.51 ,cmap=water_cmap)
+    # linear solution of isolated clusters defaults to 0
+    vmin = state_history[state_history>0].min()
     state_layer = ax2.imshow(state_history[0],
-        vmin=state_history.min(),
+        vmin=vmin,
         vmax=state_history.max(),
         cmap='coolwarm')
 
     slider = Slider(
         ax=fig.add_axes([0.2,0.01,0.6,0.03]),
-        label='t',
+        label='array_index',
         valmin=0,
         valmax=len(water_history)-1)
 
     def update(f):
-        i = int(f)
+        i = round(f)
         water_layer.set_data( water_history[i] )
         state_layer.set_data( state_history[i] )
         fig.canvas.draw()

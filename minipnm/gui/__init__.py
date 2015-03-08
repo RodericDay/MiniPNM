@@ -6,4 +6,5 @@ except ImportError:
     QtGui = type("vtk, PyQt, or pyqtgraph missing. functionality unavailable!",
                  (), {"QWidget": object, "QMainWindow": object})
 
+from .floodview import floodview
 from .ganged_plot import GangedPlot

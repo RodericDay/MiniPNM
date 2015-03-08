@@ -30,7 +30,8 @@ class Model(object):
             noise = radii
 
         self.oxygen_transport = mini.bvp.System(self.cubic.pairs)
-        self.oxygen_transport.conductances = 3.769E-8 * noise
+        self.oxygen_original_conductances = 3.769E-8 * noise
+        self.oxygen_transport.conductances = self.oxygen_original_conductances
 
         self.proton_transport = mini.bvp.System(self.cubic.pairs)
         self.proton_transport.conductances = 0.00235592 * (1-noise)
@@ -116,7 +117,7 @@ class Model(object):
 
     def block(self, blocked_pores):
         open_throats = ~self.cubic.cut(blocked_pores, directed=False)
-        self.oxygen_transport.conductances *= open_throats
+        self.oxygen_transport.conductances = self.oxygen_original_conductances * open_throats
 
 
 if __name__ == '__main__':
