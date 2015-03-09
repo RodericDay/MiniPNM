@@ -34,6 +34,7 @@ def floodview(water_history, state_history, topology=None):
         vmin=np.min(state_history),
         vmax=np.max(state_history),
         cmap='coolwarm')
+    fig.colorbar(state_layer)
 
     slider = Slider(
         ax=fig.add_axes([0.2,0.01,0.6,0.03]),
