@@ -12,17 +12,16 @@ class Model(object):
         'local_current',
     ]
 
-    def __init__(self, shape=[30,30,1], radii=None):
+    def __init__(self, shape=[40,30,1], radii=None):
         self.cubic = mini.Cubic(shape, scaling=8E-6)
         x,y,z = self.cubic.coords
 
-        self.ecsa_ratio = 20
         self.surface_area = 1.936E-9
-        self.oxygen_ratio = 4
         self.distance_from_membrane = x
         self.open_current_voltage = 1.223 # V
 
         if radii is None:
+            np.random.seed(42)
             noise = np.random.rand(self.cubic.size)
         else:
             radii = radii - radii.min()
@@ -38,12 +37,12 @@ class Model(object):
 
     @property
     def reaction_rate_constant(self):
-        T = self.temperature
+        T = 353
         I0_cat = 1.0e-11 #A/m2
-        As = self.ecsa_ratio
+        As = 20
         A = self.surface_area # m2
         n = self.overpotential
-        z = self.oxygen_ratio
+        z = 4
         # Butler-Volmer
         alpha = 0.5
         k_cat = I0_cat*As*(np.exp(-alpha*z*F/(R*T)*n) - np.exp((1-alpha)*z*F/(R*T)*n))
@@ -68,7 +67,7 @@ class Model(object):
 
         # Damped evolution
         df = 0.1*self.cell_voltage
-        self.protonic_potential = self.protonic_potential_old + df*(self.protonic_potential_new - self.protonic_potential_old)
+        self.protonic_potential = (1-df)*self.protonic_potential_old + df*self.protonic_potential_new
         self.overpotential = self.electronic_potential - self.protonic_potential - self.open_current_voltage
 
         self.ratio = self.protonic_potential_old/self.protonic_potential_new
@@ -76,10 +75,6 @@ class Model(object):
         cond2 = self.ratio.min() > 0.99
         convergence = cond1 # and cond2
         return convergence
-
-    @property
-    def temperature(self):
-        return 353
 
     @property
     def electronic_potential(self):
@@ -93,7 +88,7 @@ class Model(object):
     def local_current(self):
         k = self.reaction_rate_constant
         x = self.oxygen_mole_fraction
-        r = self.oxygen_ratio
+        r = 4
         return k*x*r*F
 
     def resolve(self, cell_voltage, overpotential=-0.02):
@@ -130,10 +125,10 @@ if __name__ == '__main__':
     model.block( x < x.mean()/2 )
     fig, ax = plt.subplots(len(model.properties)+1)
 
-    X, Y = model.polarization_curve(np.linspace(0.6,1.1,5))
+    # X, Y = model.polarization_curve(np.linspace(0.6,1.1,5))
     fig.subplots_adjust(right=0.5)
     pax = fig.add_axes([0.6, 0.1, 0.3, 0.8])
-    pax.plot(X, Y)
+    # pax.plot(X, Y)
 
     def update(V_cell):
         model.resolve(V_cell)
