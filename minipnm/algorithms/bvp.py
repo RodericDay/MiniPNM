@@ -6,7 +6,7 @@ from scipy.sparse.linalg import spsolve
 class System(object):
     '''
     this class compartmentalizes the creation of a system to an init
-    step, but then allows the direct update of conductance values and 
+    step, but then allows the direct update of conductance values and
     application of boundary conditions without rebuilding the entire matrix
     every time, for fast iterations over changing environmental conditions
     '''
@@ -95,7 +95,7 @@ class System(object):
         '''
         dbcs = dirichlet boundary conditions in {} form
         s = any leftover sink/source terms on the LHS
-        k = any linearly dependent terms ie: kx
+        k = any linearly dependent source/sink terms ie: kx
         '''
         A, b = self.system(dbcs, k)
         fixed = np.sum(list(dbcs.values()), axis=0)

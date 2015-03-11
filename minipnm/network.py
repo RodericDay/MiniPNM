@@ -377,6 +377,11 @@ class Radial(Network):
     If connectivity pairs aren't specified, default is Delaunay tessellation.
     Pruning follows to ensure there are no collisions regardless.
     '''
+    @classmethod
+    def from_cubic_topology(cls, *args, **kwargs):
+        topology = t = Cubic.from_source(*args, **kwargs)
+        geometry = Radial(t.points, t['source'], t.pairs, prune=False)
+        return geometry
 
     def __init__(self, centers, radii, pairs=None, prune=True, f=2):
         self.spheres = geometry.Spheres(self)
