@@ -302,8 +302,8 @@ class Network(dict):
 class Cubic(Network):
 
     @classmethod
-    def from_source(cls, im):
-        network = cls(im.shape)
+    def from_source(cls, im, scaling=None):
+        network = cls(im.shape, scaling)
         network['source'] = im.ravel()
         return network
 
