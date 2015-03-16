@@ -7,4 +7,4 @@ except ImportError:
                  (), {"QWidget": object, "QMainWindow": object})
 
 from .floodview import floodview
-from .ganged_plot import GangedPlot
+from .profileview import profileview

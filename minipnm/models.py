@@ -1,212 +1,159 @@
-from collections import OrderedDict, deque
 import numpy as np
 import minipnm as mini
-import MKS
-MKS.define(globals())
 
+class ArrayModel(object):
+    global F, R, nO2, nH
+    F = 96487
+    R = 8.314
+    nO2 = 4
+    nH = 2
 
-class ConvergenceError(RuntimeError):
-    pass # this guy should offer some easily examinable insight
-    # into what went wrong
+    def __init__(self, radii_array, node_spacing):
+        '''
+        Define what the network looks like
+        based on an array of radii and distances
+        '''
+        self.topology = t = mini.Cubic.from_source(radii_array)
+        self.topology.points *= node_spacing
+        self.geometry = g = mini.Radial(t.points, t['source'], t.pairs, prune=False)
 
-class OscillationError(ConvergenceError):
-    pass
-
-class AbstractModel():
-    # save last four states in a deque to check for oscillations
-    memory = deque(maxlen=4)
-
-    def __init__(self):
-        raise NotImplementedError()
-
-    def __getitem__(self, key):
-        # very sensitive to correct naming
-        if '(' in key:
-            name, units = key.rsplit(' ', 1)
-        else: # handle dimension-less
-            name, units = key, '1'
-        attribute = name.replace(' ', '_')
-        units = eval(units)
-        values = getattr(self, attribute) / units
-        return values
-
-    @property
-    def state(self):
-        state = OrderedDict()
-        for label in self.properties:
-            state[label] = self[label]
-        return state
-
-
-class Model(AbstractModel):
-
-    # first property assumed to be x-axis in profiles
-    properties = [
-        'distance from membrane (um)',
-        'protonic potential (V)',
-        # 'electronic potential (V)',
-        # 'reaction rate constant (m/s)',
-        'oxygen molar fraction',
-        'current density distribution (A/cm**2)',
-    ]
-
-    # geometric stuff
-    spacing = 150 * nm
-    number_of_nodes = 100
-    cross_sectional_area = np.pi * (15 * nm)**2
-    surface_area = 4. * np.pi * (20 * nm)**2
-    electrochemically_active_surface_area_ratio = 20
-    # transport
-    protonic_conductivity = 0.1 * S / m
-    binary_diffusion_coefficient = 2.02E-5 * ( m**3 / s ) / m
-    # environmental properties
-    pressure = 2.27 * atm
-    empirical_rate_constant = 3.44E-6 / s * spacing
-    temperature = 353 * K
-    # initial conditions
-    reaction_rate_constant = 0 * m / s
-    oxygen_molar_fraction = 0.21
-
-    def __init__(self, **kwargs):
-        # only allow changing variables if they have been defined
-        for key, value in kwargs.items():
-            assert hasattr(self, key)
-            setattr(self, key, value)
-
-        # create geometry
-        n = self.number_of_nodes
-        l = n * self.spacing / m
-        w = self.spacing / m
-        h = self.spacing / m
-        cubic = mini.Cubic([n,1,1], bbox=[l,h,w])
-        x,y,z = cubic.coords
-        self.gdl = x==x.max()
+        # some aliases for boundary conditions
+        x, y, z = self.topology.coords
+        self.distance_from_membrane = x
         self.membrane = x==x.min()
-        self.distance_from_membrane = x * m
+        self.gdl = x==x.max()
 
-        # create transport mechanisms
-        self.solid_phase = mini.bvp.System(cubic.pairs, flux_units=A, potential_units=V)
-        self.solid_phase.conductances = self.protonic_conductance
-        self.gas_phase = mini.bvp.System(cubic.pairs, flux_units=mol/s, potential_units=1)
-        self.gas_phase.conductances = self.diffusive_conductance
+        # some basic facts
+        w, h, d = self.geometry.bbox
+        self.face_area = w * h
 
-    @property
-    def gas_concentration(self):
-        return self.pressure / ( R * self.temperature )
+        self.setup_water_transport()
+        self.setup_linear_systems()
 
-    @property
-    def protonic_conductance(self):
-        s = self.protonic_conductivity
-        A = self.cross_sectional_area
-        l = self.spacing
-        return s * A / l
+    def setup_water_transport(self):
+        cmat = self.topology.adjacency_matrix
+        # since algorithm is ony looking at relative ordering
+        # just choose a quantity that represents conductivity well
+        # here, we choose areas
+        cmat.data = self.geometry.cylinders.areas
+        self.water_transport = mini.simulations.Invasion(
+            cmat=cmat,
+            capacities=self.geometry.spheres.volumes)
+        # we can update these conductivities
+        # by modifying the Invasion._cmat attribute
 
-    @property
-    def diffusive_conductance(self):
-        D = self.binary_diffusion_coefficient
-        c = self.gas_concentration
-        A = self.cross_sectional_area
-        l = self.spacing
-        return D * c * A / l
+    def setup_linear_systems(self):
+        self.oxygen_transport = mini.bvp.System(self.topology.pairs)
+        self.proton_transport = mini.bvp.System(self.topology.pairs)
 
-    @property
-    def protonic_potential(self):
-        i = self.current_density_distribution
-        A = self.surface_area * self.electrochemically_active_surface_area_ratio
-        return self.solid_phase.solve( { 0*V : self.membrane }, s=2E-14 * (i*A).units )
-        # return self.solid_phase.solve( { 0*V : self.membrane }, s=i*A )
+    def update_conductances(self, T, P, s):
+        l = self.topology.lengths
+        A = self.geometry.cylinders.areas
 
-    @property
-    def electronic_potential(self):
-        return self.gdl_voltage
+        # the saturation of the throat is the max saturation of
+        # either of its nodes
+        s = s[self.topology.pairs].max(axis=1)
+        # above a certain saturation, block (not really necessary)
+        b = s > 0.9
 
-    @property
-    def overpotential(self):
-        return self.electronic_potential - self.protonic_potential - 1.223*V
+        c = P / ( R * T )
+        D = 2.02E-5
+        self.oxygen_transport.conductances = c * D * A / l * ~b
 
-    @property
-    def oxygen_concentration(self):
-        return self.oxygen_molar_fraction * self.gas_concentration
+        n = 100000 # S / m # conductivity of nafion
+        Ap = l**2 - A # complement of duct area
+        self.proton_transport.conductances = n * Ap / l
 
-    def update_reaction_rate(self):
-        k0 = self.empirical_rate_constant
-        n = self.overpotential
-        T = self.temperature
-        z = 4
-        a = 0.5
-        e = np.exp( - a*z*F*n / ( R*T ) ) - np.exp( (1-a)*z*F*n / ( R*T ) )
-        self.reaction_rate_constant = k0 * e
+    def reaction_rate_constant(self, overpotential, temperature):
+        ''' Butler-Volmer '''
+        n = overpotential
+        T = temperature
+        SA = self.geometry.spheres.areas
+        # go together
+        x = self.distance_from_membrane
+        ecsa = 0.1
+        i0 = 1.0e-11 # A / m2
+        alpha = 0.5
+        # bv proper
+        E1 = np.exp(  -alpha   * nO2 * F / ( R * T ) * n )
+        E2 = np.exp( (1-alpha) * nO2 * F / ( R * T ) * n )
+        k = i0 * ecsa * SA * ( E1 - E2 )
+        return k # A
 
-    def update_oxygen_fraction(self):
-        k = self.reaction_rate_constant
-        C = self.gas_concentration
-        A = self.surface_area * self.electrochemically_active_surface_area_ratio
-        x = self.gas_phase.solve( { 0.21 : self.gdl }, k=k*C*A )
-        self.oxygen_molar_fraction = x
-
-    @property
-    def current_density_distribution(self):
-        k = self.reaction_rate_constant
-        c = self.oxygen_concentration
-        return k * c * F * ~(self.gdl | self.membrane)
-
-    @property
-    def current_density(self):
-        return self.current_density_distribution.sum()
-
-    @property
-    def steady_state(self):
+    def resolve(self, cell_voltage, ambient_temperature, pressure=201325,
+                time_step=0.1, flood=True):
         '''
-        verify whether we are at steady state by iterating and comparing all
-        relevant data series in memory
-
-        there are three possible outcomes
-        - convergence
-        - no solution
-        - oscillation
+        given a certain voltage and temperature,
+        slowly evolve the water transport of the network
+        resolving all the relevant non-linear equations at every step
         '''
-        keys = ['current density distribution (A/cm**2)']
+        # create containers for tracked states
+        self.oxygen_history = []
+        self.proton_history = []
+        self.current_history = []
+        # do a dry run to match the default empty water sim
+        self.solve_coupled_nonlinear(cell_voltage, ambient_temperature, pressure)
+        while flood and not self.transient_steady():
+            # generate water where reaction is taking place
+            # according to Faraday's law and stoichiometric ratios
+            generated = self.membrane * time_step * 1E-18 * 10
+            # distribute it
+            self.water_transport.distribute(generated)
+            # run it
+            self.solve_coupled_nonlinear(cell_voltage, ambient_temperature, pressure)
 
-        if len(self.memory) < 2:
-            return False
+    def transient_steady(self):
+        # goal: check history until changes stop happening
+        # currently: stop when breakthrough to gdl
+        full = self.water_transport.state > 0.9
+        return any(full & self.gdl)
 
-        elif all(np.allclose(self.memory[0][k], self.memory[1][k]) for k in keys):
-            state = self.memory.popleft()
-            self.memory.clear()
-            return True
+    def solve_coupled_nonlinear(self, electronic_potential, temperature, pressure):
+        # update all the conductances
+        saturation = self.water_transport.state
+        self.update_conductances(temperature, pressure, saturation)
+        # initial guess & etc
+        open_current_voltage = 1.223 # V
+        overpotential = -0.02 # V
+        protonic_potential = [electronic_potential - overpotential - open_current_voltage]
+        # damping factor
+        df = damping_factor = 0.1 * electronic_potential
+        for _ in range(10000):
 
-        elif len(self.memory) == 4 and \
-            all(np.allclose(self.memory[0][k], self.memory[2][k]) for k in keys) and \
-            all(np.allclose(self.memory[1][k], self.memory[3][k]) for k in keys):
-            raise OscillationError()
+            k = self.reaction_rate_constant(overpotential, temperature)
+            x = oxygen_fraction = self.oxygen_transport.solve(
+                { 0.2 : self.gdl }, k=k / ( nO2 * F ) )
+            i = k * x
+            h = self.proton_transport.solve(
+                { -i.sum() : self.membrane }, s=i)
 
-    def resolve(self, gdl_voltage, N=30):
-        self.gdl_voltage = gdl_voltage * V
-        self.memory.clear()
-        for self.state_resolution_iteration_number in range(N):
-            self.update_reaction_rate()
-            self.update_oxygen_fraction()
-            self.memory.appendleft( self.state )
-            if self.steady_state:
-                return self.state
-        raise ConvergenceError("No stability found")
+            protonic_potential.append( (1-df)*protonic_potential[-1] + df*h )
+            overpotential = electronic_potential - protonic_potential[-1] - open_current_voltage
 
-    def polarization_curve(self, span=(0, 1), samples=20, N=30):
-        error = None
-        currents = []
-        voltages = []
-        vmin, vmax = span
+            # check for conv
+            ratio = protonic_potential[-2] / h
+            cond1 = ratio.max() < 1.01
+            cond2 = ratio.min() > 0.99
+            if cond1:
+                print '.'*(_//10)
+                break
+        else:
+            raise Exception("no convergence after {}. {} {}"
+                            "".format(_, ratio.mean(), ratio.ptp()))
 
-        for gdl_voltage in np.linspace(vmax, vmin, samples):
-            try:
-                state = self.resolve(gdl_voltage, N)
-                voltages.append( gdl_voltage )
-                current_output = state['current density distribution (A/cm**2)']
-                currents.append( current_output.sum() )
-            except ConvergenceError:
-                for state in self.memory:
-                    voltages.append( gdl_voltage )
-                    current_output = state['current density distribution (A/cm**2)']
-                    currents.append( current_output.sum() )
+        # at every step, we also keep track of any cool vars
+        self.oxygen_history.append( x )
+        self.proton_history.append( h ) # or [-1]?
+        self.current_history.append( i )
 
-        return currents, voltages
+    # visual methods
+    def water_history_stack(self):
+        saturations = self.water_transport.history
+        frozen_pores = self.water_transport.expand_block_states()
+        combined = np.where(frozen_pores, np.nan, saturations)
+        W = np.dstack(self.topology.asarray(layer) for layer in combined).T
+        return W
+
+    def stack(self, history):
+        S = np.dstack(self.topology.asarray(layer) for layer in history).T
+        return S
