@@ -30,6 +30,7 @@ def update_ax(ax, x, y):
     '''
     this method averages out points according to x
     '''
+    ax.clear()
     unique_x = np.unique(x)
     average_y = [y[x==xi].mean() for xi in unique_x]
     ax.plot(unique_x, average_y, 'k')

@@ -146,7 +146,8 @@ class Tubes(Actor):
 class Scene(object):
     ticks = it.count(0)
 
-    def __init__(self, parent=None, fix_camera=True):
+    def __init__(self, parent=None, fix_camera=True,
+        background=None, size=None):
         '''
         fix_camera : more sensible default
         '''
@@ -155,10 +156,14 @@ class Scene(object):
             self.iren = self.renWin.GetInteractor()
         else:
             self.renWin = vtk.vtkRenderWindow()
+            if size is None:
+                self.renWin.SetSize(800, 600)
             self.iren = vtk.vtkRenderWindowInteractor()
             self.iren.SetRenderWindow(self.renWin)
 
         self.ren = vtk.vtkRenderer()
+        if background == 'white':
+            self.ren.SetBackground(1, 1, 1)
         self.renWin.AddRenderer(self.ren)
 
         if fix_camera:
@@ -179,7 +184,7 @@ class Scene(object):
     @property
     def count(self):
         return len([actor for actor in self])
-        
+
     def __len__(self):
         if self.count==0:
             return 0
@@ -200,7 +205,7 @@ class Scene(object):
             actor.update(t)
         self.renWin.Render()
 
-    def save(self, frames, outfile='animated.gif'):
+    def save(self, frames, outfile='animated.mp4'):
         '''
         takes a snapshot of the frames at given t, and returns the paths
         '''
@@ -211,15 +216,25 @@ class Scene(object):
 
         slide_paths = []
         for t in frames:
-            f = NamedTemporaryFile(suffix='.png', delete=False)
+            # f = NamedTemporaryFile(suffix='.png', delete=False)
+            f = open("img{:0>3}.png".format(t), 'w')
             self.update_all(t=t)
             windowToImage.Modified()
             writer.SetFileName(f.name)
             writer.Write()
             slide_paths.append( f.name )
 
-        call(["convert"] + slide_paths + [outfile])
-        call(["rm"] + slide_paths)
+        if len(slide_paths)==1:
+            if not outfile.endswith('.png'):
+                raise Exception("Cannot save single snapshot videos")
+            call(["mv","img000.png",outfile])
+        elif outfile.endswith('.mp4'):
+            call(["rm","-f", outfile])
+            call(["/usr/local/bin/ffmpeg",
+                    "-i","img%03d.png",
+                    "-c:v","libx264","-r","30",
+                    "-pix_fmt","yuv420p", outfile])
+            call(["rm"]+slide_paths)
 
     def play(self, timeout=1):
         self.iren.Initialize()

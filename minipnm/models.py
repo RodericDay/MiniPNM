@@ -54,15 +54,14 @@ class ArrayModel(object):
         # either of its nodes
         s = s[self.topology.pairs].max(axis=1)
         # above a certain saturation, block (not really necessary)
-        b = s > 0.9
 
         c = P / ( R * T )
         D = 2.02E-5
-        self.oxygen_transport.conductances = c * D * A / l * ~b
+        self.oxygen_transport.conductances = c * D * A / l * (1.0001-s)
 
-        n = 100000 # S / m # conductivity of nafion
+        S = 10000000 # S / m # conductivity of nafion
         Ap = l**2 - A # complement of duct area
-        self.proton_transport.conductances = n * Ap / l
+        self.proton_transport.conductances = S * Ap / l
 
     def reaction_rate_constant(self, overpotential, temperature):
         ''' Butler-Volmer '''
@@ -122,7 +121,7 @@ class ArrayModel(object):
 
             k = self.reaction_rate_constant(overpotential, temperature)
             x = oxygen_fraction = self.oxygen_transport.solve(
-                { 0.2 : self.gdl }, k=k / ( nO2 * F ) )
+                { 0.05 : self.gdl }, k=k / ( nO2 * F ) )
             i = k * x
             h = self.proton_transport.solve(
                 { -i.sum() : self.membrane }, s=i)
@@ -157,3 +156,9 @@ class ArrayModel(object):
     def stack(self, history):
         S = np.dstack(self.topology.asarray(layer) for layer in history).T
         return S
+
+
+if __name__ == '__main__':
+    G = np.random.uniform(400E-9, 900E-9, [20, 3, 3])
+    model = ArrayModel(G, 2 * 1000E-9)
+    mini.gui.profileview(model)

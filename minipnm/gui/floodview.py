@@ -18,7 +18,7 @@ def floodview(water_history, state_history, topology=None):
     water array should be [0, 1, NaN] for g, l, s
     the state array can be anything
     '''
-    fig, (ax1, ax2) = plt.subplots(1, 2)
+    fig, (ax1, ax2) = plt.subplots(2, 1)
 
     if topology is None:
         topology = np.zeros_like(water_history[0])
