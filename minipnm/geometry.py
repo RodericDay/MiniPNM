@@ -37,12 +37,16 @@ class Spheres(GeometryInterface):
     radii = utils.property_from(['sphere_radii'])
 
     @property
-    def areas(self):
+    def surface_areas(self):
         return (4 * np.pi * self.radii**2)
 
     @property
     def volumes(self):
         return (4./3. * np.pi * self.radii**3)
+
+    @property
+    def cross_sectional_areas(self):
+        return (np.pi * self.radii**2)
 
 
 class Cylinders(GeometryInterface):
@@ -105,9 +109,13 @@ class Cylinders(GeometryInterface):
         return np.linalg.norm(self.spans, axis=1)
 
     @property
-    def areas(self):
-        return (2 * np.pi * self.radii * self.heights)
+    def cross_sectional_areas(self):
+        return np.pi * self.radii**2
+
+    @property
+    def surface_areas(self):
+        return 2 * np.pi * self.radii * self.heights
 
     @property
     def volumes(self):
-        return (np.pi * self.radii**2 * self.heights)
+        return self.areas * self.heights

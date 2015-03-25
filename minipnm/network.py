@@ -446,3 +446,7 @@ class Radial(Network):
         total_volume = np.prod(self.bbox)
         hollowed_out = self.spheres.volumes.sum() + self.cylinders.volumes.sum()/2 # double counting of cylinders
         return hollowed_out/total_volume
+
+    def translate(self, x=0, y=0, z=0):
+        self.points += self.bbox * [x, y, z]
+        self.cylinders.midpoints += self.bbox * [x, y, z]
