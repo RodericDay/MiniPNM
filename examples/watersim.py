@@ -1,7 +1,7 @@
 import numpy as np
 import minipnm as mini
 
-G = np.random.uniform(400E-9, 900E-9, [20, 10])
+G = np.random.uniform(400E-9, 900E-9, [40, 20])
 model = mini.models.ArrayModel(G, 2 * 1000E-9)
 
 def see_2d():

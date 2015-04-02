@@ -1,103 +1,91 @@
-import itertools
 import numpy as np
 from scipy import sparse
 from scipy.sparse.linalg import spsolve
 
+
 class System(object):
-    '''
-    this class compartmentalizes the creation of a system to an init
-    step, but then allows the direct update of conductance values and
-    application of boundary conditions without rebuilding the entire matrix
-    every time, for fast iterations over changing environmental conditions
-    '''
-    def __init__(self, pairs, flux_units=1, potential_units=1, conductances=None):
-        # this may be handled better in the future, but these are unit defs
-        self.fu = flux_units
-        self.pu = potential_units
 
-        # create nodes / diags
-        self.n = n = np.max(pairs) + 1 # we need a better heuristic for stragglers
-        diags = np.arange(n) + 1 # otherwise the csr conversion drops the 0 (1)
-        D = sparse.diags(diags, 0)
-
-        # create rest / adjacency matrix
-        self.m = m = len(pairs)
-        k = np.arange(n, n+m) + 1
-        j, i = np.transpose(pairs)
-        ijk = k, (i, j)
-        A = sparse.coo_matrix(ijk, shape=(n, n))
-
-        # creation of a mapping that associates nodes and neighbors
-        self.mapping = [[] for _ in diags]
-        for row, idx in zip(A.row, A.data-1):
-            self.mapping[row].append( idx )
-        self.mapping = np.array(self.mapping)
-
-        # combine sparse matrices for the master copy
-        self._adj = (A + D)
-        self._adj.data -= 1 # recover proper indexing from (1)
-
-        # the reindex is critical, it allows us to map natural arrays to the
-        # matrix in csr form
-        self.reindex = np.argsort(self._adj.data)
-
-        if conductances is not None:
-            self.conductances = conductances
+    def __init__(self, pairs):
+        self.ij = np.transpose(pairs)
+        self._conductances = np.ones(self.ij.shape[1])
+        self.prepare()
 
     @property
     def conductances(self):
-        '''
-        the real conductance array, self._con, matches the number of entries
-        in the matrix: n nodes followed by m connections, for quick updates.
-
-        however, the value of the nodes is pre-determined by the value of the
-        adjacent connections, so the conductance setter takes care of adjusting
-        the first n methods in the array. therefore, to maintain symmetry, a
-        call only exposes the last m
-        '''
-        return self._con[-self.m:] * (self.fu / self.pu)
+        return self._conductances
 
     @conductances.setter
     def conductances(self, values):
-        # unit check
-        values = values * (self.pu / self.fu)
-        assert not hasattr(values, 'units')
+        self._conductances[:] = values
+        if any(self._conductances < 0):
+            raise RuntimeError( "Negative conductances" )
 
-        # create a skeleton and populate the conductance part
-        self._con = np.hstack([np.zeros(self.n), np.ones(self.m)*values])
+        self.prepare()
 
-        # add up all the sinks
-        for ni, neighbors in enumerate(self.mapping):
-            self._con[ni] -= self._con[neighbors].sum()
+    def prepare(self):
+        ijk = self._conductances, self.ij
+        self.C = sparse.coo_matrix(ijk).tocsr()
+        self.C.eliminate_zeros()
+        _, self.labels = sparse.csgraph.connected_components(self.C)
 
-    def system(self, dbcs={}, k=None):
-        A = self._adj.copy()
-        A.data[self.reindex] = self._con
-        b = np.zeros(self.n)
+    def build(self, dirichlet, k=0, s=0, default=0):
+        linear = k
+        source = s
+        constraints = sum(dirichlet.values())
 
-        # apply boundary conditions by turning equations into definitions
-        for bvalue, locations in dbcs.items():
-            bvalue = bvalue / self.pu
+        if constraints.max() > 1:
+            raise RuntimeError( "Too many constraints" )
 
-            A.data[self.reindex[locations]] = 1
-            A.data[self.reindex[self.mapping[locations].sum()]] = 0
-            b[locations] += bvalue
+        constrained = constraints.astype(bool)
+        b = sum(v * mask for v, mask in dirichlet.items())
 
-        # insert linear terms where applicable
-        if k is not None:
-            fixed = np.sum(list(dbcs.values()), axis=0)
-            k /= (self.fu / self.pu)
-            A.data[self.reindex[:self.n]] -= np.where(fixed, 0, k)
+        # see prepare
+        C = self.C
+        island = ~np.in1d( self.labels, self.labels[constrained] )
+        b[island] = default
+        constrained |= island
+
+        d = np.where(constrained, 1, C.sum(axis=1).A1 + linear)
+        D = sparse.diags(d, offsets=0).tocsr()
+
+        A1 = (D-C)[~constrained]
+        A2 = (D)[constrained]
+
+        A = sparse.vstack([ A1, A2 ])
+        b = np.hstack([ (b-source)[~constrained], b[constrained] ])
 
         return A, b
 
-    def solve(self, dbcs, s=None, k=None):
-        '''
-        dbcs = dirichlet boundary conditions in {} form
-        s = any leftover sink/source terms on the LHS
-        k = any linearly dependent source/sink terms ie: kx
-        '''
-        A, b = self.system(dbcs, k)
-        fixed = np.sum(list(dbcs.values()), axis=0)
-        b = np.where(fixed, b, 0 if s is None else s / self.fu)
-        return spsolve(A, b) * self.pu
+    def solve(self, *args, **kwargs):
+        A, b = self.build(*args, **kwargs)
+        x = spsolve(A, b)
+        return x
+
+
+def test_handling_of_void():
+    Z = 10
+    G = np.array([list(map(int, line)) for line in '''
+    00100
+    01010
+    00100
+    00010
+    00000
+    '''.strip().split()]).repeat(Z, axis=1).repeat(Z, axis=0)
+
+    cubic = mini.Cubic(G.shape)
+    x, y, z = cubic.coords
+    t = y[::-1]
+    sys = System(cubic.pairs)
+    sys.conductances = 1-G.flat[cubic.pairs].max(axis=1)
+    v = sys.solve({2:t==t.max()}, s=1, default=0)
+    V = cubic.asarray(v)
+
+    plt.subplot().matshow(V)
+
+
+if __name__ == '__main__':
+    import matplotlib.pyplot as plt
+    import minipnm as mini
+
+    test_handling_of_void()
+    plt.show()

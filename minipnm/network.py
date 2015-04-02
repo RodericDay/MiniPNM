@@ -239,8 +239,8 @@ class Network(dict):
         for key, value in sorted(self.data()):
             entries.append('{:<15}: {:<10}: {:<15}'.format(
                     key,
-                    value.dtype,
-                    value.shape,))
+                    str(value.dtype),
+                    str(value.shape),))
         return '<'+'\n\t'.join(entries)+\
             '\nOrder: {self.order}, Size: {self.size}>'.format(**locals())
 
@@ -302,19 +302,19 @@ class Network(dict):
 class Cubic(Network):
 
     @classmethod
-    def from_source(cls, im, scaling=None):
-        network = cls(im.shape, scaling)
+    def from_source(cls, im, spacing=None):
+        network = cls(im.shape, spacing)
         network['source'] = im.ravel()
         return network
 
-    def __init__(self, shape, scaling=None, bbox=None):
+    def __init__(self, shape, spacing=None, bbox=None):
         arr = np.atleast_3d(np.empty(shape))
 
         self.points = np.array([i for i,v in np.ndenumerate(arr)], dtype=float)
         if bbox is not None:
-            scaling = bbox / np.where( self.bbox==0, 1, self.bbox )
-        if scaling is not None:
-            self.points *= scaling
+            spacing = bbox / np.where( self.bbox==0, 1, self.bbox )
+        if spacing is not None:
+            self.points *= spacing
         if any(self.bbox==0):
             # shift up to mid for 0-dimensional planes
             if bbox is None:

@@ -118,4 +118,4 @@ class Cylinders(GeometryInterface):
 
     @property
     def volumes(self):
-        return self.areas * self.heights
+        return self.cross_sectional_areas * self.heights

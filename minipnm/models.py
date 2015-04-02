@@ -35,7 +35,7 @@ class ArrayModel(object):
         # since algorithm is ony looking at relative ordering
         # just choose a quantity that represents conductivity well
         # here, we choose areas
-        cmat.data = self.geometry.cylinders.areas
+        cmat.data = self.geometry.cylinders.cross_sectional_areas
         self.water_transport = mini.simulations.Invasion(
             cmat=cmat,
             capacities=self.geometry.spheres.volumes)
@@ -48,7 +48,7 @@ class ArrayModel(object):
 
     def update_conductances(self, T, P, s):
         l = self.topology.lengths
-        A = self.geometry.cylinders.areas
+        A = self.geometry.cylinders.cross_sectional_areas
 
         # the saturation of the throat is the max saturation of
         # either of its nodes
@@ -57,29 +57,37 @@ class ArrayModel(object):
 
         c = P / ( R * T )
         D = 2.02E-5
-        self.oxygen_transport.conductances = c * D * A / l * (1.0001-s)
+        self.oxygen_transport.conductances = c * D * A / l * (1-s)
+        # simulate some kind of GDL
+        gdl_like = self.topology.cut(self.gdl, directed=True)
+        self.oxygen_transport.conductances *= np.where(gdl_like, 0.01, 1)
 
-        S = 10000000 # S / m # conductivity of nafion
+        # http://jes.ecsdl.org/content/143/4/1254
+        # Nafion 117
+        # Ambient temperature and 100% relative humidity
+        S = 7.8E-1 # S / m # conductivity of nafion
         Ap = l**2 - A # complement of duct area
-        self.proton_transport.conductances = S * Ap / l
+        self.proton_transport.conductances = S * l
+
+        print( self.oxygen_transport.conductances.mean(),
+               self.proton_transport.conductances.mean() )
 
     def reaction_rate_constant(self, overpotential, temperature):
         ''' Butler-Volmer '''
         n = overpotential
         T = temperature
-        SA = self.geometry.spheres.areas
         # go together
         x = self.distance_from_membrane
-        ecsa = 0.1
+        ecasa = 10 * self.geometry.spheres.surface_areas
         i0 = 1.0e-11 # A / m2
         alpha = 0.5
         # bv proper
         E1 = np.exp(  -alpha   * nO2 * F / ( R * T ) * n )
         E2 = np.exp( (1-alpha) * nO2 * F / ( R * T ) * n )
-        k = i0 * ecsa * SA * ( E1 - E2 )
+        k = i0 * ecasa * ( E1 - E2 )
         return k # A
 
-    def resolve(self, cell_voltage, ambient_temperature, pressure=201325,
+    def resolve(self, cell_voltage, ambient_temperature, pressure=101325,
                 time_step=0.1, flood=True):
         '''
         given a certain voltage and temperature,
@@ -121,7 +129,9 @@ class ArrayModel(object):
 
             k = self.reaction_rate_constant(overpotential, temperature)
             x = oxygen_fraction = self.oxygen_transport.solve(
-                { 0.05 : self.gdl }, k=k / ( nO2 * F ) )
+                { 0.1 : self.gdl }, k=k / ( nO2 * F ) )
+            if not np.isfinite(x).all():
+                return
             i = k * x
             h = self.proton_transport.solve(
                 { -i.sum() : self.membrane }, s=i)
@@ -134,7 +144,7 @@ class ArrayModel(object):
             cond1 = ratio.max() < 1.01
             cond2 = ratio.min() > 0.99
             if cond1:
-                print '.'*(_//10)
+                print( '.'*(_//10) )
                 break
         else:
             raise Exception("no convergence after {}. {} {}"
@@ -159,6 +169,8 @@ class ArrayModel(object):
 
 
 if __name__ == '__main__':
-    G = np.random.uniform(400E-9, 900E-9, [20, 3, 3])
+    np.random.seed(42)
+    G = np.random.uniform(400E-9, 900E-9, [20, 10])
+    print( G.mean() )
     model = ArrayModel(G, 2 * 1000E-9)
     mini.gui.profileview(model)

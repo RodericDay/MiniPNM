@@ -87,13 +87,14 @@ def profileview(model):
 
     slider.on_changed(update)
     # generate an undersampled polcurve
-    for V in np.linspace(0.05, 1.0, 5):
+    for V in np.linspace(0.05, 1.0, 10):
         slider.set_val(V)
     slider.set_val(0.65)
 
     # some extra interactivity
     fig.canvas.mpl_connect('button_press_event',
-        lambda event: slider.set_val(event.ydata) if pcax is event.inaxes else None)
+        lambda event: slider.set_val(event.ydata)
+        if pcax is event.inaxes else None)
     plt.show()
 
 
